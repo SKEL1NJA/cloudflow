@@ -1,0 +1,23 @@
+{
+  "name": "cloudflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Distributed workflow orchestration platform",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
+  }
+}
