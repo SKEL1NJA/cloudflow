@@ -12,3 +12,4 @@ Thumbs.db
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+packages/db/src/generated/

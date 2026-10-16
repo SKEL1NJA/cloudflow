@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { env } from './config/env.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
+import { registerInfrastructure } from './plugins/infrastructure.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -25,6 +26,7 @@ export function buildApp(): FastifyInstance {
   });
 
   registerErrorHandler(app);
+  registerInfrastructure(app);
   void app.register(healthRoutes);
 
   return app;

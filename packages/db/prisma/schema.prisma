@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StepType {
+  HTTP_REQUEST
+  DELAY
+  TRANSFORM
+  NOTIFICATION
+}
+
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum StepExecutionStatus {
+  PENDING
+  RUNNING
+  RETRYING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workflows  Workflow[]
+  executions WorkflowExecution[]
+  apiKeys    ApiKey[]
+
+  @@map("users")
+}
+
+model Workflow {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  name          String
+  description   String?
+  enabled       Boolean  @default(true)
+  maxAttempts   Int      @default(3) @map("max_attempts")
+  backoffBaseMs Int      @default(2000) @map("backoff_base_ms")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps      WorkflowStep[]
+  executions WorkflowExecution[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  workflowId String   @map("workflow_id") @db.Uuid
+  position   Int
+  type       StepType
+  name       String
+  config     Json
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  workflow       Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepExecutions StepExecution[]
+
+  @@unique([workflowId, position])
+  @@map("workflow_steps")
+}
+
+model WorkflowExecution {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  workflowId     String          @map("workflow_id") @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  status         ExecutionStatus @default(QUEUED)
+  idempotencyKey String?         @map("idempotency_key")
+  input          Json?
+  error          String?
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  startedAt      DateTime?       @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?       @map("finished_at") @db.Timestamptz(3)
+
+  workflow Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps    StepExecution[]
+  logs     ExecutionLog[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([workflowId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("workflow_executions")
+}
+
+model StepExecution {
+  id          String              @id @default(uuid(7)) @db.Uuid
+  executionId String              @map("execution_id") @db.Uuid
+  stepId      String?             @map("step_id") @db.Uuid
+  position    Int
+  type        StepType
+  name        String
+  config      Json
+  status      StepExecutionStatus @default(PENDING)
+  attempts    Int                 @default(0)
+  input       Json?
+  output      Json?
+  error       String?
+  workerId    String?             @map("worker_id")
+  nextRetryAt DateTime?           @map("next_retry_at") @db.Timestamptz(3)
+  startedAt   DateTime?           @map("started_at") @db.Timestamptz(3)
+  finishedAt  DateTime?           @map("finished_at") @db.Timestamptz(3)
+  durationMs  Int?                @map("duration_ms")
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  execution WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  step      WorkflowStep?     @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  logs      ExecutionLog[]
+
+  @@unique([executionId, position])
+  @@index([stepId])
+  @@map("step_executions")
+}
+
+model ExecutionLog {
+  id              BigInt   @id @default(autoincrement())
+  executionId     String   @map("execution_id") @db.Uuid
+  stepExecutionId String?  @map("step_execution_id") @db.Uuid
+  level           LogLevel @default(INFO)
+  message         String
+  meta            Json?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  execution     WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  stepExecution StepExecution?    @relation(fields: [stepExecutionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId, id])
+  @@index([stepExecutionId])
+  @@index([createdAt])
+  @@map("execution_logs")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  name       String
+  keyPrefix  String    @map("key_prefix")
+  keyHash    String    @unique @map("key_hash")
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
+}
