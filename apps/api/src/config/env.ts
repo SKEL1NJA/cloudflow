@@ -14,6 +14,12 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
+
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_EXPIRES_IN: z
+    .string()
+    .regex(/^\d+[smhd]$/, 'use a format like 15m, 1h or 7d')
+    .default('1h'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -5,19 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "pino-pretty": "^13.2.0",
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "@cloudflow/db": "*",
+    "@node-rs/argon2": "^2.2.2",
     "fastify": "^5.12.5",
     "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
     "zod": "^4.6.5"
   }
 }

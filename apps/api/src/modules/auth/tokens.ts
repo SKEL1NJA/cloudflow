@@ -1,0 +1,26 @@
+import { SignJWT, jwtVerify } from 'jose';
+import { env } from '../../config/env.js';
+
+const secret = new TextEncoder().encode(env.JWT_SECRET);
+const ISSUER = 'cloudflow-api';
+
+export async function signAccessToken(userId: string): Promise<string> {
+  return new SignJWT({})
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(userId)
+    .setIssuer(ISSUER)
+    .setIssuedAt()
+    .setExpirationTime(env.JWT_EXPIRES_IN)
+    .sign(secret);
+}
+
+export async function verifyAccessToken(token: string): Promise<{ userId: string }> {
+  const { payload } = await jwtVerify(token, secret, {
+    issuer: ISSUER,
+    algorithms: ['HS256'],
+  });
+  if (!payload.sub) {
+    throw new Error('token has no subject');
+  }
+  return { userId: payload.sub };
+}
