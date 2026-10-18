@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from '@cloudflow/db';
 import {
+  assertNever,
   workflowStepSchema,
   type Paginated,
   type WorkflowDefinition,
@@ -9,7 +10,6 @@ import {
   type WorkflowSummary,
 } from '@cloudflow/shared';
 import { isUniqueViolation } from '../../lib/db-errors.js';
-import { assertNever } from '../../lib/assert-never.js';
 import { ConflictError, NotFoundError } from '../../lib/errors.js';
 
 const detailInclude = { steps: { orderBy: { position: 'asc' } } } satisfies Prisma.WorkflowInclude;
@@ -66,7 +66,7 @@ function translateWriteError(err: unknown): unknown {
     : err;
 }
 
-async function lockOwnedWorkflow(
+export async function lockOwnedWorkflow(
   tx: Prisma.TransactionClient,
   id: string,
   userId: string,

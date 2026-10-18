@@ -18,6 +18,7 @@
   "dependencies": {
     "@cloudflow/db": "*",
     "@cloudflow/shared": "*",
+    "@cloudflow/queue": "*",
     "@node-rs/argon2": "^2.2.2",
     "fastify": "^5.12.5",
     "ioredis": "^6.0.0",

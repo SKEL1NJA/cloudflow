@@ -56,3 +56,7 @@ export const workflowStepSchema = z.discriminatedUnion('type', [
 
 export type WorkflowStepInput = z.infer<typeof workflowStepSchema>;
 export type WorkflowStepFormValues = z.input<typeof workflowStepSchema>;
+export type HttpRequestConfig = z.infer<typeof httpRequestConfigSchema>;
+export type DelayConfig = z.infer<typeof delayConfigSchema>;
+export type TransformConfig = z.infer<typeof transformConfigSchema>;
+export type NotificationConfig = z.infer<typeof notificationConfigSchema>;
