@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { env } from './config/env.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { workflowRoutes } from './modules/workflows/workflows.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerInfrastructure } from './plugins/infrastructure.js';
@@ -33,6 +34,7 @@ export function buildApp(): FastifyInstance {
 
   void app.register(healthRoutes);
   void app.register(authRoutes);
+  void app.register(workflowRoutes);
 
   return app;
 }
