@@ -8,6 +8,7 @@ import { executionRoutes } from './modules/executions/executions.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerInfrastructure } from './plugins/infrastructure.js';
+import { registerMetrics } from './plugins/metrics.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -32,6 +33,7 @@ export function buildApp(): FastifyInstance {
   registerErrorHandler(app);
   registerInfrastructure(app);
   registerAuth(app);
+  registerMetrics(app);
 
   void app.register(healthRoutes);
   void app.register(authRoutes);

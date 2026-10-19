@@ -1,4 +1,8 @@
 import { Queue, Worker } from 'bullmq';
+import { parseRedisUrl } from './redis.js';
+
+export * from './redis.js';
+export * from './workers.js';
 
 export const STEP_QUEUE_NAME = 'workflow-steps';
 export const DEAD_LETTER_QUEUE_NAME = 'workflow-steps-dead';
@@ -8,7 +12,7 @@ export interface StepJobData {
   stepExecutionId: string;
 }
 
-export type DeadLetterReason = 'RETRIES_EXHAUSTED' | 'NON_RETRYABLE';
+export type DeadLetterReason = 'RETRIES_EXHAUSTED' | 'NON_RETRYABLE' | 'WORKER_LOST';
 
 export interface DeadLetterData extends StepJobData {
   stepName: string;
@@ -21,29 +25,6 @@ export interface DeadLetterData extends StepJobData {
 export type StepQueue = Queue<StepJobData>;
 export type DeadLetterQueue = Queue<DeadLetterData>;
 export type StepProcessor = (job: { data: StepJobData }) => Promise<void>;
-
-export interface RedisConnectionOptions {
-  host: string;
-  port: number;
-  db: number;
-  username?: string;
-  password?: string;
-  tls?: Record<string, never>;
-}
-
-export function parseRedisUrl(redisUrl: string): RedisConnectionOptions {
-  const url = new URL(redisUrl);
-  const db = url.pathname.length > 1 ? Number(url.pathname.slice(1)) : 0;
-  const options: RedisConnectionOptions = {
-    host: url.hostname,
-    port: url.port ? Number(url.port) : 6379,
-    db: Number.isInteger(db) ? db : 0,
-  };
-  if (url.username) options.username = decodeURIComponent(url.username);
-  if (url.password) options.password = decodeURIComponent(url.password);
-  if (url.protocol === 'rediss:') options.tls = {};
-  return options;
-}
 
 function producerConnection(redisUrl: string) {
   return { ...parseRedisUrl(redisUrl), enableOfflineQueue: false };
@@ -88,6 +69,28 @@ export async function enqueueRetry(
     delay: delayMs,
     ...INFRASTRUCTURE_RETRY,
   });
+}
+
+export async function enqueueRecovery(
+  queue: StepQueue,
+  data: StepJobData,
+  token: number,
+): Promise<void> {
+  await queue.add('step', data, {
+    jobId: `${data.stepExecutionId}-recover-${token}`,
+    ...INFRASTRUCTURE_RETRY,
+  });
+}
+
+export async function listLiveStepIds(queue: StepQueue, maxJobs: number): Promise<Set<string> | null> {
+  const states = ['waiting', 'active', 'delayed', 'prioritized'] as const;
+  const counts = await queue.getJobCounts(...states);
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (total > maxJobs) return null;
+  if (total === 0) return new Set();
+
+  const jobs = await queue.getJobs([...states], 0, -1);
+  return new Set(jobs.flatMap((job) => (job ? [job.data.stepExecutionId] : [])));
 }
 
 export async function deadLetterStep(

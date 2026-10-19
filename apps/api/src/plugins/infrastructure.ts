@@ -1,5 +1,10 @@
 import { createPrismaClient, type PrismaClient } from '@cloudflow/db';
-import { createStepQueue, type StepQueue } from '@cloudflow/queue';
+import {
+  createDeadLetterQueue,
+  createStepQueue,
+  type DeadLetterQueue,
+  type StepQueue,
+} from '@cloudflow/queue';
 import type { FastifyInstance } from 'fastify';
 import { Redis } from 'ioredis';
 import { env } from '../config/env.js';
@@ -9,6 +14,7 @@ declare module 'fastify' {
     prisma: PrismaClient;
     redis: Redis;
     queue: StepQueue;
+    deadLetterQueue: DeadLetterQueue;
   }
 }
 
@@ -29,8 +35,15 @@ export function registerInfrastructure(app: FastifyInstance): void {
   app.decorate('redis', redis);
   app.decorate('queue', queue);
 
+  const deadLetterQueue = createDeadLetterQueue(env.REDIS_URL);
+  deadLetterQueue.on('error', (err) =>
+    app.log.warn({ err }, 'dead-letter queue connection error'),
+  );
+  app.decorate('deadLetterQueue', deadLetterQueue);
+
   app.addHook('onClose', async () => {
     await queue.close();
+    await deadLetterQueue.close();
     await prisma.$disconnect();
     redis.disconnect();
   });
