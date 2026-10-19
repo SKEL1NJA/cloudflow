@@ -95,6 +95,8 @@ model WorkflowExecution {
   workflowId     String          @map("workflow_id") @db.Uuid
   userId         String          @map("user_id") @db.Uuid
   status         ExecutionStatus @default(QUEUED)
+  maxAttempts    Int             @default(3) @map("max_attempts")
+  backoffBaseMs  Int             @default(2000) @map("backoff_base_ms")
   idempotencyKey String?         @map("idempotency_key")
   input          Json?
   error          String?

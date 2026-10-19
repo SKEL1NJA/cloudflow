@@ -62,4 +62,6 @@ export interface ExecutionSummary {
 export interface ExecutionDetail extends ExecutionSummary {
   input: JsonValue | null;
   steps: StepExecutionView[];
+  maxAttempts: number;
+  backoffBaseMs: number;
 }

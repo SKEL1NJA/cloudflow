@@ -13,6 +13,7 @@ const envSchema = z.object({
   DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+  HTTP_ALLOW_PRIVATE_NETWORK: z.stringbool().default(false),
 });
 
 function loadEnv() {

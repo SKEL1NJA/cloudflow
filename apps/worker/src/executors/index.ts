@@ -18,7 +18,7 @@ export async function executeStep(
     case 'NOTIFICATION':
       return runNotification(step.config, ctx);
     case 'HTTP_REQUEST':
-      return runHttpRequest();
+      return runHttpRequest(step.config, ctx);
     default:
       return assertNever(step);
   }

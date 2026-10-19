@@ -12,10 +12,16 @@ export interface SeededExecution {
   stepIds: string[];
 }
 
+export interface SeedPolicy {
+  maxAttempts?: number;
+  backoffBaseMs?: number;
+}
+
 export async function seedExecution(
   prisma: PrismaClient,
   steps: SeedStep[],
   input?: Prisma.InputJsonObject,
+  policy: SeedPolicy = {},
 ): Promise<SeededExecution> {
   const user = await prisma.user.create({
     data: { email: `${randomUUID()}@example.com`, passwordHash: 'not-a-real-hash' },
@@ -29,6 +35,7 @@ export async function seedExecution(
       workflowId: workflow.id,
       userId: user.id,
       input,
+      ...policy,
       steps: { create: stepData },
     },
     include: { steps: { orderBy: { position: 'asc' } } },
@@ -36,12 +43,19 @@ export async function seedExecution(
   return { executionId: execution.id, stepIds: execution.steps.map((step) => step.id) };
 }
 
-export async function waitForFinish(prisma: PrismaClient, executionId: string, timeoutMs = 15_000) {
+export async function waitFor<T>(check: () => Promise<T | null>, timeoutMs = 10_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const execution = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } });
-    if (execution.status !== 'QUEUED' && execution.status !== 'RUNNING') return execution;
-    if (Date.now() > deadline) throw new Error(`Execution still ${execution.status} after ${timeoutMs}ms`);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    const value = await check();
+    if (value !== null) return value;
+    if (Date.now() > deadline) throw new Error(`Condition not met within ${timeoutMs}ms`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
+}
+
+export async function waitForFinish(prisma: PrismaClient, executionId: string, timeoutMs = 15_000) {
+  return waitFor(async () => {
+    const execution = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } });
+    return execution.status === 'QUEUED' || execution.status === 'RUNNING' ? null : execution;
+  }, timeoutMs);
 }

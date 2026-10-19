@@ -27,7 +27,11 @@ beforeEach(async () => {
 
 function run(
   workflowId: string,
-  options: { token?: string; headers?: Record<string, string>; payload?: Record<string, unknown> } = {},
+  options: {
+    token?: string;
+    headers?: Record<string, string>;
+    payload?: Record<string, unknown>;
+  } = {},
 ) {
   return app.inject({
     method: 'POST',
@@ -41,6 +45,7 @@ describe('POST /workflows/:id/run', () => {
   it('creates a queued execution, snapshots the steps and enqueues only the first step', async () => {
     const workflow = await createWorkflow(app, token);
     const res = await run(workflow.id, { payload: { input: { videoId: 42 } } });
+
     expect(res.statusCode).toBe(202);
 
     const body = res.json<ExecutionDetail>();
@@ -54,7 +59,11 @@ describe('POST /workflows/:id/run', () => {
 
     const firstStepId = body.steps[0]?.id as string;
     const job = await app.queue.getJob(firstStepId);
-    expect(job?.data).toEqual({ executionId: body.id, stepExecutionId: firstStepId });
+
+    expect(job?.data).toEqual({
+      executionId: body.id,
+      stepExecutionId: firstStepId,
+    });
     expect(await app.queue.getJobCounts('waiting')).toEqual({ waiting: 1 });
   });
 
@@ -67,7 +76,13 @@ describe('POST /workflows/:id/run', () => {
       url: `/workflows/${workflow.id}`,
       headers: authHeader(token),
       payload: sampleWorkflow({
-        steps: [{ type: 'DELAY', name: 'Completely different', config: { durationMs: 1000 } }],
+        steps: [
+          {
+            type: 'DELAY',
+            name: 'Completely different',
+            config: { durationMs: 1000 },
+          },
+        ],
       }),
     });
 
@@ -76,6 +91,7 @@ describe('POST /workflows/:id/run', () => {
       url: `/executions/${execution.id}`,
       headers: authHeader(token),
     });
+
     expect(res.json<ExecutionDetail>().steps.map((step) => step.name)).toEqual([
       'Fetch data',
       'Pick fields',
@@ -83,11 +99,41 @@ describe('POST /workflows/:id/run', () => {
     ]);
   });
 
+  it('snapshots the retry policy so later workflow edits do not change a queued run', async () => {
+    const workflow = await createWorkflow(app, token, {
+      maxAttempts: 5,
+      backoffBaseMs: 4000,
+    });
+
+    const execution = (await run(workflow.id)).json<ExecutionDetail>();
+
+    expect(execution.maxAttempts).toBe(5);
+    expect(execution.backoffBaseMs).toBe(4000);
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/workflows/${workflow.id}`,
+      headers: authHeader(token),
+      payload: { maxAttempts: 2 },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/executions/${execution.id}`,
+      headers: authHeader(token),
+    });
+
+    expect(res.json<ExecutionDetail>().maxAttempts).toBe(5);
+  });
+
   it('refuses to run a disabled workflow', async () => {
     const workflow = await createWorkflow(app, token, { enabled: false });
     const res = await run(workflow.id);
+
     expect(res.statusCode).toBe(409);
-    expect(res.json<{ error: { code: string } }>().error.code).toBe('WORKFLOW_DISABLED');
+    expect(res.json<{ error: { code: string } }>().error.code).toBe(
+      'WORKFLOW_DISABLED',
+    );
     expect(await app.prisma.workflowExecution.count()).toBe(0);
     expect(await app.queue.getJobCounts('waiting')).toEqual({ waiting: 0 });
   });
@@ -95,6 +141,7 @@ describe('POST /workflows/:id/run', () => {
   it("returns 404 for another user's workflow and queues nothing", async () => {
     const workflow = await createWorkflow(app, token);
     const res = await run(workflow.id, { token: otherToken });
+
     expect(res.statusCode).toBe(404);
     expect(await app.prisma.workflowExecution.count()).toBe(0);
     expect(await app.queue.getJobCounts('waiting')).toEqual({ waiting: 0 });
@@ -102,8 +149,13 @@ describe('POST /workflows/:id/run', () => {
 
   it('rejects input that is not a JSON object and oversized idempotency keys', async () => {
     const workflow = await createWorkflow(app, token);
-    const badInput = await run(workflow.id, { payload: { input: 'text' } });
-    const badKey = await run(workflow.id, { headers: { 'idempotency-key': 'k'.repeat(201) } });
+    const badInput = await run(workflow.id, {
+      payload: { input: 'text' },
+    });
+    const badKey = await run(workflow.id, {
+      headers: { 'idempotency-key': 'k'.repeat(201) },
+    });
+
     expect(badInput.statusCode).toBe(400);
     expect(badKey.statusCode).toBe(400);
   });
@@ -119,7 +171,9 @@ describe('idempotency keys', () => {
 
     expect(first.statusCode).toBe(202);
     expect(second.statusCode).toBe(200);
-    expect(second.json<ExecutionDetail>().id).toBe(first.json<ExecutionDetail>().id);
+    expect(second.json<ExecutionDetail>().id).toBe(
+      first.json<ExecutionDetail>().id,
+    );
     expect(await app.prisma.workflowExecution.count()).toBe(1);
     expect(await app.queue.getJobCounts('waiting')).toEqual({ waiting: 1 });
   });
@@ -128,7 +182,10 @@ describe('idempotency keys', () => {
     const workflow = await createWorkflow(app, token);
     const headers = { 'idempotency-key': 'double-click' };
 
-    const [a, b] = await Promise.all([run(workflow.id, { headers }), run(workflow.id, { headers })]);
+    const [a, b] = await Promise.all([
+      run(workflow.id, { headers }),
+      run(workflow.id, { headers }),
+    ]);
 
     expect([a.statusCode, b.statusCode].sort()).toEqual([200, 202]);
     expect(a.json<ExecutionDetail>().id).toBe(b.json<ExecutionDetail>().id);
@@ -143,6 +200,7 @@ describe('idempotency keys', () => {
 
     await run(first.id, { headers });
     const res = await run(second.id, { headers });
+
     expect(res.statusCode).toBe(409);
   });
 });
@@ -151,11 +209,17 @@ describe('execution queries', () => {
   it('lists only the caller executions and filters by status', async () => {
     const workflow = await createWorkflow(app, token);
     const otherWorkflow = await createWorkflow(app, otherToken);
+
     await run(workflow.id);
     await run(workflow.id);
     await run(otherWorkflow.id, { token: otherToken });
 
-    const all = await app.inject({ method: 'GET', url: '/executions', headers: authHeader(token) });
+    const all = await app.inject({
+      method: 'GET',
+      url: '/executions',
+      headers: authHeader(token),
+    });
+
     expect(all.json<Paginated<ExecutionSummary>>().pagination.total).toBe(2);
 
     const done = await app.inject({
@@ -163,17 +227,20 @@ describe('execution queries', () => {
       url: '/executions?status=SUCCESS',
       headers: authHeader(token),
     });
+
     expect(done.json<Paginated<ExecutionSummary>>().data).toHaveLength(0);
   });
 
   it("returns 404 for another user's execution", async () => {
     const workflow = await createWorkflow(app, token);
     const execution = (await run(workflow.id)).json<ExecutionDetail>();
+
     const res = await app.inject({
       method: 'GET',
       url: `/executions/${execution.id}`,
       headers: authHeader(otherToken),
     });
+
     expect(res.statusCode).toBe(404);
   });
 });
