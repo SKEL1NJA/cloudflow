@@ -1,5 +1,5 @@
-import type { Prisma, PrismaClient } from '@cloudflow/db';
-import { enqueueStep, type StepQueue } from '@cloudflow/queue';
+import { Prisma, type PrismaClient } from '@cloudflow/db';
+import { enqueueRecovery, enqueueStep, type StepQueue } from '@cloudflow/queue';
 import type {
   ExecutionDetail,
   ExecutionListQuery,
@@ -280,4 +280,181 @@ export async function listExecutions(
       totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
     },
   };
+}
+
+async function assertOwned(
+  tx: Prisma.TransactionClient,
+  id: string,
+  userId: string,
+): Promise<void> {
+  const found = await tx.workflowExecution.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+
+  if (!found) {
+    throw new NotFoundError('Execution not found');
+  }
+}
+
+export async function cancelExecution(
+  prisma: PrismaClient,
+  userId: string,
+  id: string,
+): Promise<ExecutionDetail> {
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.workflowExecution.updateMany({
+      where: {
+        id,
+        userId,
+        status: { in: ['QUEUED', 'RUNNING'] },
+      },
+      data: {
+        status: 'CANCELLED',
+        finishedAt: new Date(),
+        error: 'Cancelled by user',
+      },
+    });
+
+    if (count === 0) {
+      await assertOwned(tx, id, userId);
+
+      throw new AppError(
+        409,
+        'EXECUTION_FINISHED',
+        'This execution has already finished',
+      );
+    }
+
+    await tx.stepExecution.updateMany({
+      where: {
+        executionId: id,
+        status: { in: ['PENDING', 'RETRYING'] },
+      },
+      data: {
+        status: 'SKIPPED',
+        nextRetryAt: null,
+      },
+    });
+
+    await tx.executionLog.create({
+      data: {
+        executionId: id,
+        level: 'WARN',
+        message: 'Execution cancelled by user',
+      },
+    });
+  });
+
+  return getExecution(prisma, userId, id);
+}
+
+export async function retryExecution(
+  deps: RunDeps,
+  userId: string,
+  id: string,
+): Promise<ExecutionDetail> {
+  const { prisma, queue, log } = deps;
+
+  const target = await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status::text AS status
+      FROM workflow_executions
+      WHERE id = ${id}::uuid
+        AND user_id = ${userId}::uuid
+      FOR UPDATE
+    `;
+
+    const current = locked[0];
+
+    if (!current) {
+      throw new NotFoundError('Execution not found');
+    }
+
+    if (current.status !== 'FAILED') {
+      throw new AppError(
+        409,
+        'EXECUTION_NOT_FAILED',
+        'Only failed executions can be retried',
+      );
+    }
+
+    const steps = await tx.stepExecution.findMany({
+      where: { executionId: id },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        position: true,
+        status: true,
+      },
+    });
+
+    const first = steps.find((step) => step.status !== 'SUCCESS');
+
+    if (!first) {
+      throw new AppError(
+        409,
+        'NOTHING_TO_RETRY',
+        'Every step already succeeded',
+      );
+    }
+
+    await tx.stepExecution.updateMany({
+      where: {
+        executionId: id,
+        position: { gte: first.position },
+      },
+      data: {
+        status: 'PENDING',
+        attempts: 0,
+        input: Prisma.DbNull,
+        output: Prisma.DbNull,
+        error: null,
+        workerId: null,
+        nextRetryAt: null,
+        startedAt: null,
+        finishedAt: null,
+        durationMs: null,
+      },
+    });
+
+    await tx.workflowExecution.update({
+      where: { id },
+      data: {
+        status: 'QUEUED',
+        error: null,
+        finishedAt: null,
+      },
+    });
+
+    await tx.executionLog.create({
+      data: {
+        executionId: id,
+        stepExecutionId: first.id,
+        level: 'INFO',
+        message: `Execution retried from step "${first.name}"`,
+      },
+    });
+
+    return first;
+  });
+
+  try {
+    await enqueueRecovery(
+      queue,
+      {
+        executionId: id,
+        stepExecutionId: target.id,
+      },
+      Date.now(),
+    );
+  } catch (err) {
+    log.error(
+      { err, executionId: id },
+      'failed to enqueue retried step, the reconciler will recover it',
+    );
+  }
+
+  return getExecution(prisma, userId, id);
 }

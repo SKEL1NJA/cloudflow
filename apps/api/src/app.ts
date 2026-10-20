@@ -5,10 +5,16 @@ import { healthRoutes } from './modules/health/health.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { workflowRoutes } from './modules/workflows/workflows.routes.js';
 import { executionRoutes } from './modules/executions/executions.routes.js';
+import { apiKeyRoutes } from './modules/api-keys/api-keys.routes.js';
+import { logRoutes } from './modules/logs/logs.routes.js';
+import { overviewRoutes } from './modules/overview/overview.routes.js';
+import { queueRoutes } from './modules/queue/queue.routes.js';
+import { workerRoutes } from './modules/workers/workers.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerInfrastructure } from './plugins/infrastructure.js';
 import { registerMetrics } from './plugins/metrics.js';
+import { registerDocs } from './plugins/docs.js';
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -39,6 +45,13 @@ export function buildApp(): FastifyInstance {
   void app.register(authRoutes);
   void app.register(workflowRoutes);
   void app.register(executionRoutes);
+  void app.register(overviewRoutes);
+  void app.register(queueRoutes);
+  void app.register(workerRoutes);
+  void app.register(logRoutes);
+  void app.register(apiKeyRoutes);
+
+  registerDocs(app);
 
   return app;
 }

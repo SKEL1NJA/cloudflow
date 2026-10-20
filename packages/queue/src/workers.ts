@@ -14,8 +14,8 @@ export interface WorkerIdentity {
 
 export interface WorkerStats {
   processing: number;
-  jobsHandled: number;
-  jobErrors: number;
+  completed: number;
+  failed: number;
 }
 
 export interface WorkerHeartbeat extends WorkerIdentity, WorkerStats {
@@ -57,8 +57,8 @@ function isHeartbeat(value: unknown): value is WorkerHeartbeat {
     typeof record.lastHeartbeat === 'string' &&
     typeof record.stopped === 'boolean' &&
     typeof record.processing === 'number' &&
-    typeof record.jobsHandled === 'number' &&
-    typeof record.jobErrors === 'number'
+    typeof record.completed === 'number' &&
+    typeof record.failed === 'number'
   );
 }
 

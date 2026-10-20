@@ -113,6 +113,7 @@ model WorkflowExecution {
   @@index([workflowId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt])
+  @@index([userId, status])
   @@map("workflow_executions")
 }
 
@@ -143,6 +144,7 @@ model StepExecution {
 
   @@unique([executionId, position])
   @@index([stepId])
+  @@index([finishedAt])
   @@map("step_executions")
 }
 

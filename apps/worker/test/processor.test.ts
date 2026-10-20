@@ -182,4 +182,24 @@ describe('redelivery (no worker running, the processor is called directly)', () 
       processor({ data: { executionId: randomUUID(), stepExecutionId: randomUUID() } }),
     ).resolves.toBeUndefined();
   });
+
+  it('drops a job for a cancelled execution and skips its pending step', async () => {
+    const { executionId, stepIds } = await seedExecution(prisma, [
+      { type: 'NOTIFICATION', name: 'One', config: { message: 'a' } },
+    ]);
+
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'CANCELLED' },
+    });
+
+    await processor({ data: { executionId, stepExecutionId: stepIds[0] as string } });
+
+    const step = await prisma.stepExecution.findUniqueOrThrow({
+      where: { id: stepIds[0] as string },
+    });
+
+    expect(step.status).toBe('SKIPPED');
+    expect(step.attempts).toBe(0);
+  });
 });

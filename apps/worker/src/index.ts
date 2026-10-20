@@ -12,21 +12,36 @@ import { logger } from './logger.js';
 import { createWorkerMetrics, startMetricsServer, type MetricsServer } from './metrics.js';
 import { createStepProcessor } from './processor.js';
 import { startReconciler } from './reconciler.js';
+import type { StepObserver } from './observer.js';
 
 const workerId = `worker-${os.hostname()}-${process.pid}`;
 const prisma = createPrismaClient(env.DATABASE_URL);
 const queue = createStepQueue(env.REDIS_URL);
 const deadLetterQueue = createDeadLetterQueue(env.REDIS_URL);
+
 queue.on('error', (err) => logger.warn({ err }, 'queue connection error'));
-deadLetterQueue.on('error', (err) => logger.warn({ err }, 'dead-letter queue connection error'));
+deadLetterQueue.on('error', (err) =>
+  logger.warn({ err }, 'dead-letter queue connection error'),
+);
+
 await queue.waitUntilReady();
 
 if (env.HTTP_ALLOW_PRIVATE_NETWORK) {
-  logger.warn('HTTP_ALLOW_PRIVATE_NETWORK is on, HTTP steps can reach private network addresses');
+  logger.warn(
+    'HTTP_ALLOW_PRIVATE_NETWORK is on, HTTP steps can reach private network addresses',
+  );
 }
 
-const stats = { processing: 0, jobsHandled: 0, jobErrors: 0 };
+const stats = { processing: 0, completed: 0, failed: 0 };
 const metrics = createWorkerMetrics(() => stats.processing);
+
+const observer: StepObserver = {
+  stepFinished(event) {
+    if (event.outcome === 'success') stats.completed += 1;
+    if (event.outcome === 'failed') stats.failed += 1;
+    metrics.observer.stepFinished(event);
+  },
+};
 
 const processor = createStepProcessor({
   prisma,
@@ -35,26 +50,31 @@ const processor = createStepProcessor({
   workerId,
   logger,
   allowPrivateNetwork: env.HTTP_ALLOW_PRIVATE_NETWORK,
-  observer: metrics.observer,
+  observer,
 });
 
 const trackedProcessor: StepProcessor = async (job) => {
   stats.processing += 1;
   try {
     await processor(job);
-    stats.jobsHandled += 1;
-  } catch (err) {
-    stats.jobErrors += 1;
-    throw err;
   } finally {
     stats.processing -= 1;
   }
 };
 
-const worker = createStepWorker(env.REDIS_URL, trackedProcessor, env.WORKER_CONCURRENCY);
+const worker = createStepWorker(
+  env.REDIS_URL,
+  trackedProcessor,
+  env.WORKER_CONCURRENCY,
+);
+
 worker.on('error', (err) => logger.warn({ err }, 'worker error'));
-worker.on('failed', (job, err) => logger.error({ jobId: job?.id, err }, 'job failed'));
-worker.on('stalled', (jobId) => logger.warn({ jobId }, 'job stalled and will be redelivered'));
+worker.on('failed', (job, err) =>
+  logger.error({ jobId: job?.id, err }, 'job failed'),
+);
+worker.on('stalled', (jobId) =>
+  logger.warn({ jobId }, 'job stalled and will be redelivered'),
+);
 
 const heartbeat = startHeartbeat({
   redisUrl: env.REDIS_URL,
@@ -84,9 +104,14 @@ const reconciler =
     : undefined;
 
 let metricsServer: MetricsServer | undefined;
+
 if (env.WORKER_METRICS_PORT > 0) {
   try {
-    metricsServer = await startMetricsServer(metrics.registry, env.WORKER_METRICS_PORT, env.WORKER_METRICS_HOST);
+    metricsServer = await startMetricsServer(
+      metrics.registry,
+      env.WORKER_METRICS_PORT,
+      env.WORKER_METRICS_HOST,
+    );
     logger.info({ port: env.WORKER_METRICS_PORT }, 'metrics server listening');
   } catch (err) {
     logger.warn({ err }, 'metrics server could not start, continuing without it');

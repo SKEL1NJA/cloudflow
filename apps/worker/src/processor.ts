@@ -60,7 +60,9 @@ function hasErrorCode(err: unknown, code: string): boolean {
 }
 
 function classifyError(err: unknown): Failure {
-  if (err instanceof ZodError) return { error: 'Invalid step configuration', retryable: false };
+  if (err instanceof ZodError) {
+    return { error: 'Invalid step configuration', retryable: false };
+  }
 
   if (err instanceof StepError) {
     return { error: err.message.slice(0, MAX_ERROR_LENGTH), retryable: err.retryable };
@@ -71,7 +73,8 @@ function classifyError(err: unknown): Failure {
 }
 
 export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
-  const { prisma, queue, deadLetterQueue, workerId, logger, allowPrivateNetwork, observer } = deps;
+  const { prisma, queue, deadLetterQueue, workerId, logger, allowPrivateNetwork, observer } =
+    deps;
 
   async function record(
     executionId: string,
@@ -308,11 +311,23 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
 
     if (step.status === 'SUCCESS') {
       const queued = await queueNextStep(executionId, step.position);
-      logger.info({ executionId, stepExecutionId, queued }, 'step already completed, skipped re-execution');
+      logger.info(
+        { executionId, stepExecutionId, queued },
+        'step already completed, skipped re-execution',
+      );
       return;
     }
 
     if (step.status === 'FAILED' || step.status === 'SKIPPED') return;
+
+    if (step.execution.status === 'CANCELLED') {
+      await prisma.stepExecution.updateMany({
+        where: { id: stepExecutionId, status: { in: ['PENDING', 'RETRYING'] } },
+        data: { status: 'SKIPPED', nextRetryAt: null },
+      });
+      return;
+    }
+
     if (step.execution.status !== 'QUEUED' && step.execution.status !== 'RUNNING') return;
 
     const input = await resolveInput(executionId, step.position, step.execution.input);
