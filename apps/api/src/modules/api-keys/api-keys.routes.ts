@@ -1,6 +1,7 @@
 import { createApiKeySchema } from '@cloudflow/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { RULES } from '../../lib/rate-limit-rules.js';
 import { requireUserId } from '../../plugins/auth.js';
 import { createApiKey, listApiKeys, revokeApiKey } from './api-keys.service.js';
 
@@ -10,11 +11,20 @@ export const apiKeyRoutes: FastifyPluginAsync = async (app) => {
   app.addHook('onRequest', app.authenticate);
   app.addHook('onRequest', app.requireSession);
 
-  app.post('/api-keys', async (request, reply) => {
-    const { name } = createApiKeySchema.parse(request.body);
-    const created = await createApiKey(app.prisma, requireUserId(request), name);
-    return reply.status(201).header('cache-control', 'no-store').send(created);
-  });
+  app.post(
+    '/api-keys',
+    { preHandler: app.limiter.byUser(RULES.createApiKey) },
+    async (request, reply) => {
+      const { name } = createApiKeySchema.parse(request.body);
+      const created = await createApiKey(
+        app.prisma,
+        requireUserId(request),
+        name,
+      );
+
+      return reply.status(201).header('cache-control', 'no-store').send(created);
+    },
+  );
 
   app.get('/api-keys', async (request) => {
     return { data: await listApiKeys(app.prisma, requireUserId(request)) };

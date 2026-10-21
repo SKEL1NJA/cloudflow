@@ -32,6 +32,9 @@ export function registerErrorHandler(app: FastifyInstance): void {
           }),
         },
       };
+
+      if (error.headers) reply.headers(error.headers);
+
       return reply.status(error.statusCode).send(body);
     }
 

@@ -1,6 +1,9 @@
 import { listWorkers } from '@cloudflow/queue';
 import type { FastifyInstance } from 'fastify';
 import { Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
+import { env } from '../config/env.js';
+import { safeEqual } from '../lib/crypto.js';
+import { UnauthorizedError } from '../lib/errors.js';
 
 const QUEUE_STATES = ['waiting', 'active', 'delayed', 'prioritized', 'completed', 'failed'] as const;
 
@@ -18,8 +21,13 @@ export function registerMetrics(app: FastifyInstance): void {
 
   app.addHook('onResponse', async (request, reply) => {
     const route = request.routeOptions.url ?? 'unmatched';
+
     httpDuration.observe(
-      { method: request.method, route, status: String(reply.statusCode) },
+      {
+        method: request.method,
+        route,
+        status: String(reply.statusCode),
+      },
       reply.elapsedTime / 1000,
     );
   });
@@ -32,7 +40,10 @@ export function registerMetrics(app: FastifyInstance): void {
     async collect() {
       try {
         const counts = await app.queue.getJobCounts(...QUEUE_STATES);
-        for (const state of QUEUE_STATES) this.set({ state }, counts[state] ?? 0);
+
+        for (const state of QUEUE_STATES) {
+          this.set({ state }, counts[state] ?? 0);
+        }
       } catch (err) {
         app.log.warn({ err }, 'could not read queue depth for metrics');
       }
@@ -61,17 +72,41 @@ export function registerMetrics(app: FastifyInstance): void {
     async collect() {
       try {
         const counts = { online: 0, busy: 0, offline: 0 };
-        for (const worker of await listWorkers(app.redis)) counts[worker.status] += 1;
-        for (const [status, value] of Object.entries(counts)) this.set({ status }, value);
+
+        for (const worker of await listWorkers(app.redis)) {
+          counts[worker.status] += 1;
+        }
+
+        for (const [status, value] of Object.entries(counts)) {
+          this.set({ status }, value);
+        }
       } catch (err) {
         app.log.warn({ err }, 'could not read workers for metrics');
       }
     },
   });
 
-  app.get('/metrics', async (_request, reply) => {
-    return reply.header('content-type', registry.contentType).send(await registry.metrics());
-  });
+  app.get(
+    '/metrics',
+    {
+      onRequest: async (request) => {
+        if (!env.METRICS_TOKEN) return;
+
+        const token = /^Bearer (.+)$/i.exec(
+          request.headers.authorization ?? '',
+        )?.[1];
+
+        if (!token || !safeEqual(token, env.METRICS_TOKEN)) {
+          throw new UnauthorizedError();
+        }
+      },
+    },
+    async (_request, reply) => {
+      return reply
+        .header('content-type', registry.contentType)
+        .send(await registry.metrics());
+    },
+  );
 
   app.addHook('onClose', async () => {
     registry.clear();

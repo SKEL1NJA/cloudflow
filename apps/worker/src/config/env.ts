@@ -19,6 +19,7 @@ const envSchema = z.object({
   RECONCILER_INTERVAL_MS: z.coerce.number().int().min(0).default(30_000),
   RECONCILER_GRACE_MS: z.coerce.number().int().min(5000).default(60_000),
   RECONCILER_STUCK_RUNNING_MS: z.coerce.number().int().min(330_000).default(600_000),
+  MAINTENANCE_INTERVAL_MS: z.coerce.number().int().min(0).default(3_600_000),
   HTTP_ALLOW_PRIVATE_NETWORK: z.stringbool().default(false),
 });
 

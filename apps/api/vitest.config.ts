@@ -25,6 +25,9 @@ export default defineConfig({
       REDIS_URL: 'redis://127.0.0.1:6379/1',
       JWT_SECRET: 'test-only-secret-that-is-at-least-32-characters-long',
       JWT_EXPIRES_IN: '1h',
+      RATE_LIMIT_ENABLED: 'false',
+      METRICS_TOKEN: 'test-metrics-token-1234567890',
+      CORS_ORIGINS: 'http://localhost:5173',
     },
   },
 });

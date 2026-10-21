@@ -8,5 +8,5 @@ export function registerDocs(app: FastifyInstance): void {
     mode: 'static',
     specification: { document: buildOpenApiDocument() as never },
   });
-  void app.register(swaggerUi, { routePrefix: '/docs' });
+  void app.register(swaggerUi, { routePrefix: '/docs', staticCSP: true });
 }

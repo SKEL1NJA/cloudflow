@@ -12,6 +12,7 @@ import { logger } from './logger.js';
 import { createWorkerMetrics, startMetricsServer, type MetricsServer } from './metrics.js';
 import { createStepProcessor } from './processor.js';
 import { startReconciler } from './reconciler.js';
+import { startMaintenance } from './maintenance.js';
 import type { StepObserver } from './observer.js';
 
 const workerId = `worker-${os.hostname()}-${process.pid}`;
@@ -103,6 +104,11 @@ const reconciler =
       )
     : undefined;
 
+const maintenance =
+  env.MAINTENANCE_INTERVAL_MS > 0
+    ? startMaintenance(prisma, logger, env.MAINTENANCE_INTERVAL_MS)
+    : undefined;
+
 let metricsServer: MetricsServer | undefined;
 
 if (env.WORKER_METRICS_PORT > 0) {
@@ -123,6 +129,7 @@ logger.info({ workerId, concurrency: env.WORKER_CONCURRENCY }, 'worker started')
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutting down, waiting for active jobs to finish');
   await reconciler?.stop();
+  await maintenance?.stop();
   await worker.close();
   await heartbeat.stop();
   await metricsServer?.close();

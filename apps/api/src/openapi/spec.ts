@@ -29,8 +29,11 @@ interface Operation {
 }
 
 const operations: Operation[] = [
-  { method: 'post', path: '/auth/register', tag: 'Auth', summary: 'Create an account', access: 'public', body: registerSchema, success: 201, errors: [400, 409] },
-  { method: 'post', path: '/auth/login', tag: 'Auth', summary: 'Sign in and receive an access token', access: 'public', body: loginSchema, success: 200, errors: [400, 401] },
+  { method: 'post', path: '/auth/register', tag: 'Auth', summary: 'Create an account', access: 'public', body: registerSchema, success: 201, errors: [400, 409, 429] },
+  { method: 'post', path: '/auth/login', tag: 'Auth', summary: 'Sign in and receive an access token', access: 'public', body: loginSchema, success: 200, errors: [400, 401, 429] },
+  { method: 'post', path: '/auth/refresh', tag: 'Auth', summary: 'Exchange the refresh cookie for a new access token', access: 'public', success: 200, errors: [401, 403, 429] },
+  { method: 'post', path: '/auth/logout', tag: 'Auth', summary: 'End this session', access: 'public', success: 204, errors: [403] },
+  { method: 'post', path: '/auth/logout-all', tag: 'Auth', summary: 'End every session of this account', access: 'session', success: 204, errors: [401, 403] },
   { method: 'get', path: '/auth/me', tag: 'Auth', summary: 'Get the signed-in user', access: 'any', success: 200, errors: [401] },
 
   { method: 'post', path: '/workflows', tag: 'Workflows', summary: 'Create a workflow', access: 'any', body: workflowDefinitionSchema, success: 201, errors: [400, 401, 409] },
@@ -39,7 +42,7 @@ const operations: Operation[] = [
   { method: 'put', path: '/workflows/{id}', tag: 'Workflows', summary: 'Replace a workflow and all of its steps', access: 'any', body: workflowDefinitionSchema, success: 200, errors: [400, 401, 404, 409] },
   { method: 'patch', path: '/workflows/{id}', tag: 'Workflows', summary: 'Update workflow details', access: 'any', body: workflowPatchSchema, success: 200, errors: [400, 401, 404, 409] },
   { method: 'delete', path: '/workflows/{id}', tag: 'Workflows', summary: 'Delete a workflow and its history', access: 'any', success: 204, errors: [400, 401, 404] },
-  { method: 'post', path: '/workflows/{id}/run', tag: 'Executions', summary: 'Start an execution', access: 'any', body: runWorkflowBodySchema, bodyRequired: false, idempotencyKey: true, success: 202, errors: [400, 401, 404, 409, 503] },
+  { method: 'post', path: '/workflows/{id}/run', tag: 'Executions', summary: 'Start an execution', access: 'any', body: runWorkflowBodySchema, bodyRequired: false, idempotencyKey: true, success: 202, errors: [400, 401, 404, 409, 429, 503] },
 
   { method: 'get', path: '/executions', tag: 'Executions', summary: 'List executions', access: 'any', query: executionListQuerySchema, success: 200, errors: [400, 401] },
   { method: 'get', path: '/executions/{id}', tag: 'Executions', summary: 'Get an execution with its steps', access: 'any', success: 200, errors: [400, 401, 404] },
@@ -53,7 +56,7 @@ const operations: Operation[] = [
   { method: 'get', path: '/queue/activity', tag: 'Monitoring', summary: 'Finished steps over time', access: 'any', query: statsRangeQuerySchema, success: 200, errors: [400, 401] },
   { method: 'get', path: '/logs', tag: 'Monitoring', summary: 'Search execution logs, newest first', access: 'any', query: logListQuerySchema, success: 200, errors: [400, 401] },
 
-  { method: 'post', path: '/api-keys', tag: 'API keys', summary: 'Create an API key (shown once)', access: 'session', body: createApiKeySchema, success: 201, errors: [400, 401, 403, 409] },
+  { method: 'post', path: '/api-keys', tag: 'API keys', summary: 'Create an API key (shown once)', access: 'session', body: createApiKeySchema, success: 201, errors: [400, 401, 403, 409, 429] },
   { method: 'get', path: '/api-keys', tag: 'API keys', summary: 'List API keys', access: 'session', success: 200, errors: [401, 403] },
   { method: 'delete', path: '/api-keys/{id}', tag: 'API keys', summary: 'Revoke an API key', access: 'session', success: 204, errors: [400, 401, 403, 404] },
 
@@ -74,6 +77,7 @@ const ERROR_TEXT: Record<number, string> = {
   403: 'Not allowed with these credentials',
   404: 'Not found',
   409: 'Conflict with the current state',
+  429: 'Too many requests, see the Retry-After header',
   503: 'A dependency is unavailable',
 };
 
@@ -84,14 +88,22 @@ const apiErrorSchema = {
     error: {
       type: 'object',
       required: ['code', 'message'],
-      properties: { code: { type: 'string' }, message: { type: 'string' }, details: {} },
+      properties: {
+        code: { type: 'string' },
+        message: { type: 'string' },
+        details: {},
+      },
     },
   },
 };
 
 type JsonObject = Record<string, unknown>;
 
-function toJsonSchema(schema: z.ZodType, name: string, components: JsonObject): JsonObject {
+function toJsonSchema(
+  schema: z.ZodType,
+  name: string,
+  components: JsonObject,
+): JsonObject {
   const { $schema: _schema, $defs, ...rest } = z.toJSONSchema(schema, {
     io: 'input',
     unrepresentable: 'any',
@@ -105,14 +117,20 @@ function toJsonSchema(schema: z.ZodType, name: string, components: JsonObject): 
   for (const [key, definition] of Object.entries($defs ?? {})) {
     components[`${name}_${key}`] = rewrite(definition);
   }
+
   return rewrite(rest);
 }
 
-function queryParameters(schema: z.ZodType, name: string, components: JsonObject): JsonObject[] {
+function queryParameters(
+  schema: z.ZodType,
+  name: string,
+  components: JsonObject,
+): JsonObject[] {
   const json = toJsonSchema(schema, name, components) as {
     properties?: Record<string, unknown>;
     required?: string[];
   };
+
   return Object.entries(json.properties ?? {}).map(([key, value]) => ({
     name: key,
     in: 'query',
@@ -121,16 +139,28 @@ function queryParameters(schema: z.ZodType, name: string, components: JsonObject
   }));
 }
 
-function describeOperation(operation: Operation, components: JsonObject): JsonObject {
+function describeOperation(
+  operation: Operation,
+  components: JsonObject,
+): JsonObject {
   const id = `${operation.method}_${operation.path}`.replace(/\W+/g, '_');
   const parameters: JsonObject[] = [];
 
   if (operation.path.includes('{id}')) {
-    parameters.push({ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } });
+    parameters.push({
+      name: 'id',
+      in: 'path',
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+    });
   }
+
   if (operation.query) {
-    parameters.push(...queryParameters(operation.query, `${id}_query`, components));
+    parameters.push(
+      ...queryParameters(operation.query, `${id}_query`, components),
+    );
   }
+
   if (operation.idempotencyKey) {
     parameters.push({
       name: 'Idempotency-Key',
@@ -142,18 +172,31 @@ function describeOperation(operation: Operation, components: JsonObject): JsonOb
   }
 
   const errorContent = {
-    'application/json': { schema: { $ref: '#/components/schemas/ApiError' } },
+    'application/json': {
+      schema: { $ref: '#/components/schemas/ApiError' },
+    },
   };
-  const responses: JsonObject = { [operation.success]: { description: SUCCESS_TEXT[operation.success] } };
+
+  const responses: JsonObject = {
+    [operation.success]: {
+      description: SUCCESS_TEXT[operation.success],
+    },
+  };
+
   for (const status of operation.errors ?? []) {
-    responses[status] = { description: ERROR_TEXT[status], content: errorContent };
+    responses[status] = {
+      description: ERROR_TEXT[status],
+      content: errorContent,
+    };
   }
 
   return {
     operationId: id,
     tags: [operation.tag],
     summary: operation.summary,
-    ...(operation.access !== 'public' && { security: [{ bearerAuth: [] }] }),
+    ...(operation.access !== 'public' && {
+      security: [{ bearerAuth: [] }],
+    }),
     ...(operation.access === 'session' && {
       description: 'Requires a signed-in session. API keys cannot call this endpoint.',
     }),
@@ -161,7 +204,15 @@ function describeOperation(operation: Operation, components: JsonObject): JsonOb
     ...(operation.body && {
       requestBody: {
         required: operation.bodyRequired ?? true,
-        content: { 'application/json': { schema: toJsonSchema(operation.body, `${id}_body`, components) } },
+        content: {
+          'application/json': {
+            schema: toJsonSchema(
+              operation.body,
+              `${id}_body`,
+              components,
+            ),
+          },
+        },
       },
     }),
     responses,
@@ -186,9 +237,13 @@ export function buildOpenApiDocument(): JsonObject {
         'Authenticate with Authorization: Bearer <token>, using the access token from /auth/login or an API key that starts with cf_. Request bodies and query parameters are generated from the same schemas the API validates with. Responses are described by status code only.',
     },
     servers: [{ url: '/' }],
-    tags: [...new Set(operations.map((operation) => operation.tag))].map((name) => ({ name })),
+    tags: [...new Set(operations.map((operation) => operation.tag))].map(
+      (name) => ({ name }),
+    ),
     components: {
-      securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } },
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer' },
+      },
       schemas,
     },
     paths,

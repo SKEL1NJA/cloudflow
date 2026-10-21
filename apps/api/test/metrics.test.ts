@@ -19,10 +19,18 @@ describe('GET /metrics', () => {
   it('labels request durations with route templates, never raw URLs', async () => {
     const id = randomUUID();
     const unknown = randomUUID();
+
     await app.inject({ method: 'GET', url: `/workflows/${id}` });
     await app.inject({ method: 'GET', url: `/nothing-here/${unknown}` });
 
-    const res = await app.inject({ method: 'GET', url: '/metrics' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/metrics',
+      headers: {
+        authorization: 'Bearer test-metrics-token-1234567890',
+      },
+    });
+
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toContain('text/plain');
     expect(res.body).toContain('cloudflow_http_request_duration_seconds_count');
@@ -32,7 +40,14 @@ describe('GET /metrics', () => {
   });
 
   it('reports queue depth, dead-letter depth and worker counts', async () => {
-    const res = await app.inject({ method: 'GET', url: '/metrics' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/metrics',
+      headers: {
+        authorization: 'Bearer test-metrics-token-1234567890',
+      },
+    });
+
     expect(res.body).toMatch(/cloudflow_queue_jobs\{state="waiting"\} \d+/);
     expect(res.body).toMatch(/cloudflow_queue_jobs\{state="active"\} \d+/);
     expect(res.body).toMatch(/cloudflow_dead_letter_jobs \d+/);

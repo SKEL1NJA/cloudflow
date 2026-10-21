@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
+import { ForbiddenError, RateLimitError, UnauthorizedError } from '../lib/errors.js';
+import { RULES } from '../lib/rate-limit-rules.js';
 import { API_KEY_PREFIX, authenticateApiKey } from '../modules/api-keys/api-keys.service.js';
 import { verifyAccessToken } from '../modules/auth/tokens.js';
 
@@ -26,8 +27,14 @@ export function registerAuth(app: FastifyInstance): void {
     }
 
     if (token.startsWith(API_KEY_PREFIX)) {
+      const rule = RULES.invalidApiKeys;
+      const failures = await app.limiter.peek(rule, request.ip);
+      if (failures.count >= rule.max) {
+        throw new RateLimitError(failures.retryAfterSeconds);
+      }
       const userId = await authenticateApiKey(app.prisma, token);
       if (!userId) {
+        await app.limiter.consume(rule, request.ip);
         throw new UnauthorizedError('Invalid or revoked API key');
       }
       request.userId = userId;
