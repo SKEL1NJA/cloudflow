@@ -9,8 +9,8 @@ export interface FailedStep {
   durationMs: number | null;
 }
 
-export async function markStepFailed(prisma: PrismaClient, failed: FailedStep): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+export async function markStepFailed(prisma: PrismaClient, failed: FailedStep): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
     await tx.stepExecution.update({
       where: { id: failed.stepId },
       data: {
@@ -28,9 +28,10 @@ export async function markStepFailed(prisma: PrismaClient, failed: FailedStep): 
       },
       data: { status: 'SKIPPED' },
     });
-    await tx.workflowExecution.updateMany({
+    const execution = await tx.workflowExecution.updateMany({
       where: { id: failed.executionId, status: { in: ['QUEUED', 'RUNNING'] } },
       data: { status: 'FAILED', error: failed.summary, finishedAt: new Date() },
     });
+    return execution.count > 0;
   });
 }

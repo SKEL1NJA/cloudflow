@@ -4,6 +4,7 @@ import {
   enqueueRecovery,
   listLiveStepIds,
   type DeadLetterQueue,
+  type EventPublisher,
   type StepQueue,
 } from '@cloudflow/queue';
 import { assertNever } from '@cloudflow/shared';
@@ -28,6 +29,7 @@ export interface ReconcilerDeps {
   queue: StepQueue;
   deadLetterQueue: DeadLetterQueue;
   logger: Logger;
+  events?: EventPublisher;
   onRecovery?: (reason: RecoveryReason) => void;
 }
 
@@ -46,6 +48,8 @@ interface Candidate {
   status: 'PENDING' | 'RETRYING' | 'RUNNING';
   attempts: number;
   maxAttempts: number;
+  userId: string;
+  workflowId: string;
   updatedAt: Date;
 }
 
@@ -56,7 +60,9 @@ function reasonFor(candidate: Candidate): RecoveryReason {
     case 'RETRYING':
       return 'retry_lost';
     case 'RUNNING':
-      return candidate.attempts >= candidate.maxAttempts ? 'worker_lost_exhausted' : 'worker_lost';
+      return candidate.attempts >= candidate.maxAttempts
+        ? 'worker_lost_exhausted'
+        : 'worker_lost';
     default:
       return assertNever(candidate.status);
   }
@@ -82,7 +88,7 @@ export async function reconcileOnce(
   options: ReconcilerOptions,
   now: Date = new Date(),
 ): Promise<ReconcileResult> {
-  const { prisma, queue, deadLetterQueue, logger, onRecovery } = deps;
+  const { prisma, queue, deadLetterQueue, logger, onRecovery, events } = deps;
   const graceCutoff = new Date(now.getTime() - options.graceMs);
   const stuckCutoff = new Date(now.getTime() - options.stuckRunningMs);
 
@@ -94,6 +100,8 @@ export async function reconcileOnce(
            s.status::text AS status,
            s.attempts,
            e.max_attempts AS "maxAttempts",
+           e.user_id AS "userId",
+           e.workflow_id AS "workflowId",
            s.updated_at AS "updatedAt"
     FROM step_executions s
     JOIN workflow_executions e ON e.id = s.execution_id
@@ -117,12 +125,21 @@ export async function reconcileOnce(
     ORDER BY s.id
     LIMIT ${options.batchSize}`;
 
-  const result: ReconcileResult = { checked: candidates.length, recovered: 0, failed: 0, skipped: 0 };
+  const result: ReconcileResult = {
+    checked: candidates.length,
+    recovered: 0,
+    failed: 0,
+    skipped: 0,
+  };
+
   if (candidates.length === 0) return result;
 
   const live = await listLiveStepIds(queue, options.maxLiveJobsScanned);
   if (live === null) {
-    logger.warn({ candidates: candidates.length }, 'queue too deep to scan, skipping reconciliation');
+    logger.warn(
+      { candidates: candidates.length },
+      'queue too deep to scan, skipping reconciliation',
+    );
     result.skipped = candidates.length;
     return result;
   }
@@ -134,11 +151,19 @@ export async function reconcileOnce(
     }
 
     const seenAt = new Date(candidate.updatedAt);
-    const touchedAt = new Date(Math.max(now.getTime(), seenAt.getTime() + 1));
+    const touchedAt = new Date(
+      Math.max(now.getTime(), seenAt.getTime() + 1),
+    );
+
     const won = await prisma.stepExecution.updateMany({
-      where: { id: candidate.id, status: candidate.status, updatedAt: seenAt },
+      where: {
+        id: candidate.id,
+        status: candidate.status,
+        updatedAt: seenAt,
+      },
       data: { updatedAt: touchedAt },
     });
+
     if (won.count === 0) {
       result.skipped += 1;
       continue;
@@ -146,19 +171,28 @@ export async function reconcileOnce(
 
     const reason = reasonFor(candidate);
     const message = describe(reason, candidate.name);
-    const target = { executionId: candidate.executionId, stepExecutionId: candidate.id };
+    const target = {
+      executionId: candidate.executionId,
+      stepExecutionId: candidate.id,
+    };
 
     try {
       await prisma.executionLog.create({
-        data: { ...target, level: 'WARN', message, meta: { reason } },
+        data: {
+          ...target,
+          level: 'WARN',
+          message,
+          meta: { reason },
+        },
       });
     } catch (err) {
       logger.warn({ err, ...target }, 'failed to persist reconciler log');
     }
+
     logger.warn({ ...target, reason }, message);
 
     if (reason === 'worker_lost_exhausted') {
-      await markStepFailed(prisma, {
+      const executionFailed = await markStepFailed(prisma, {
         stepId: candidate.id,
         executionId: candidate.executionId,
         position: candidate.position,
@@ -166,6 +200,32 @@ export async function reconcileOnce(
         summary: `Step "${candidate.name}" failed: the worker stopped responding during all ${candidate.attempts} attempts`,
         durationMs: null,
       });
+
+      const scope = {
+        userId: candidate.userId,
+        workflowId: candidate.workflowId,
+        executionId: candidate.executionId,
+        at: new Date().toISOString(),
+      };
+
+      await events?.publish({
+        type: 'step.updated',
+        ...scope,
+        stepId: candidate.id,
+        position: candidate.position,
+        status: 'FAILED',
+        attempts: candidate.attempts,
+        nextRetryAt: null,
+      });
+
+      if (executionFailed) {
+        await events?.publish({
+          type: 'execution.updated',
+          ...scope,
+          status: 'FAILED',
+        });
+      }
+
       try {
         await deadLetterStep(deadLetterQueue, {
           ...target,
@@ -176,13 +236,18 @@ export async function reconcileOnce(
           failedAt: new Date().toISOString(),
         });
       } catch (err) {
-        logger.warn({ err, ...target }, 'failed to publish to the dead-letter queue');
+        logger.warn(
+          { err, ...target },
+          'failed to publish to the dead-letter queue',
+        );
       }
+
       result.failed += 1;
     } else {
       await enqueueRecovery(queue, target, touchedAt.getTime());
       result.recovered += 1;
     }
+
     onRecovery?.(reason);
   }
 
@@ -215,6 +280,7 @@ export function startReconciler(
 
   function schedule(): void {
     if (stopped) return;
+
     timer = setTimeout(() => {
       inFlight = pass().finally(schedule);
     }, intervalMs * (0.8 + Math.random() * 0.4));

@@ -5,16 +5,22 @@ import {
   enqueueStep,
   type DeadLetterQueue,
   type DeadLetterReason,
+  type EventPublisher,
   type StepProcessor,
   type StepQueue,
 } from '@cloudflow/queue';
-import { workflowStepSchema, type JsonValue } from '@cloudflow/shared';
+import {
+  workflowStepSchema,
+  type ExecutionStatus,
+  type JsonValue,
+  type StepExecutionStatus,
+} from '@cloudflow/shared';
 import type { Logger } from 'pino';
 import { ZodError } from 'zod';
 import { executeStep } from './executors/index.js';
 import { StepError, type StepContext } from './executors/types.js';
-import { backoffDelayMs, decideFailure } from './retry.js';
 import type { StepObserver } from './observer.js';
+import { backoffDelayMs, decideFailure } from './retry.js';
 import { markStepFailed } from './step-state.js';
 
 export interface ProcessorDeps {
@@ -25,6 +31,7 @@ export interface ProcessorDeps {
   logger: Logger;
   allowPrivateNetwork: boolean;
   observer?: StepObserver;
+  events?: EventPublisher;
 }
 
 interface StepRow {
@@ -32,6 +39,11 @@ interface StepRow {
   executionId: string;
   position: number;
   name: string;
+}
+
+interface Scope {
+  userId: string;
+  workflowId: string;
 }
 
 interface Failure {
@@ -52,7 +64,6 @@ const PINO_LEVELS = {
   WARN: 'warn',
   ERROR: 'error',
 } as const satisfies Record<LogLevel, string>;
-
 const MAX_ERROR_LENGTH = 2000;
 
 function hasErrorCode(err: unknown, code: string): boolean {
@@ -60,20 +71,16 @@ function hasErrorCode(err: unknown, code: string): boolean {
 }
 
 function classifyError(err: unknown): Failure {
-  if (err instanceof ZodError) {
-    return { error: 'Invalid step configuration', retryable: false };
-  }
-
+  if (err instanceof ZodError) return { error: 'Invalid step configuration', retryable: false };
   if (err instanceof StepError) {
     return { error: err.message.slice(0, MAX_ERROR_LENGTH), retryable: err.retryable };
   }
-
   const message = err instanceof Error ? err.message : String(err);
   return { error: message.slice(0, MAX_ERROR_LENGTH), retryable: true };
 }
 
 export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
-  const { prisma, queue, deadLetterQueue, workerId, logger, allowPrivateNetwork, observer } =
+  const { prisma, queue, deadLetterQueue, workerId, logger, allowPrivateNetwork, observer, events } =
     deps;
 
   async function record(
@@ -84,7 +91,6 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
     meta?: Record<string, JsonValue>,
   ): Promise<void> {
     logger[PINO_LEVELS[level]]({ executionId, stepExecutionId, ...meta }, message);
-
     try {
       await prisma.executionLog.create({
         data: {
@@ -100,14 +106,48 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
     }
   }
 
+  function emitExecution(scope: Scope, executionId: string, status: ExecutionStatus): Promise<void> {
+    return (
+      events?.publish({
+        type: 'execution.updated',
+        userId: scope.userId,
+        workflowId: scope.workflowId,
+        executionId,
+        status,
+        at: new Date().toISOString(),
+      }) ?? Promise.resolve()
+    );
+  }
+
+  function emitStep(
+    scope: Scope,
+    step: StepRow,
+    status: StepExecutionStatus,
+    attempts: number,
+    nextRetryAt: Date | null,
+  ): Promise<void> {
+    return (
+      events?.publish({
+        type: 'step.updated',
+        userId: scope.userId,
+        workflowId: scope.workflowId,
+        executionId: step.executionId,
+        stepId: step.id,
+        position: step.position,
+        status,
+        attempts,
+        nextRetryAt: nextRetryAt?.toISOString() ?? null,
+        at: new Date().toISOString(),
+      }) ?? Promise.resolve()
+    );
+  }
+
   async function queueNextStep(executionId: string, position: number): Promise<boolean> {
     const next = await prisma.stepExecution.findUnique({
       where: { executionId_position: { executionId, position: position + 1 } },
       select: { id: true },
     });
-
     if (!next) return false;
-
     await enqueueStep(queue, { executionId, stepExecutionId: next.id });
     return true;
   }
@@ -120,12 +160,10 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
     if (position === 0) {
       return (executionInput as JsonValue | null) ?? {};
     }
-
     const previous = await prisma.stepExecution.findUnique({
       where: { executionId_position: { executionId, position: position - 1 } },
       select: { output: true },
     });
-
     return (previous?.output as JsonValue | null) ?? {};
   }
 
@@ -145,7 +183,6 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
         },
         select: { attempts: true },
       });
-
       return claimed.attempts;
     } catch (err) {
       if (hasErrorCode(err, 'P2025')) return null;
@@ -164,7 +201,6 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
         name: step.name,
         config: step.config,
       });
-
       return { ok: true, output: await executeStep(definition, input, ctx) };
     } catch (err) {
       return { ok: false, ...classifyError(err) };
@@ -173,11 +209,12 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
 
   async function completeStep(
     step: StepRow,
+    scope: Scope,
     attempt: number,
     output: JsonValue,
     durationMs: number,
   ): Promise<void> {
-    const next = await prisma.$transaction(async (tx) => {
+    const { next, finished } = await prisma.$transaction(async (tx) => {
       await tx.stepExecution.update({
         where: { id: step.id },
         data: {
@@ -187,56 +224,53 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
           durationMs,
         },
       });
-
       const following = await tx.stepExecution.findUnique({
         where: {
           executionId_position: { executionId: step.executionId, position: step.position + 1 },
         },
         select: { id: true },
       });
-
+      let completed = false;
       if (!following) {
-        await tx.workflowExecution.updateMany({
+        const done = await tx.workflowExecution.updateMany({
           where: { id: step.executionId, status: 'RUNNING' },
           data: { status: 'SUCCESS', finishedAt: new Date() },
         });
+        completed = done.count > 0;
       }
-
-      return following;
+      return { next: following, finished: completed };
     });
 
     await record(step.executionId, step.id, 'INFO', `Step "${step.name}" succeeded`, {
       durationMs,
       attempt,
     });
+    await emitStep(scope, step, 'SUCCESS', attempt, null);
 
     if (next) {
       await enqueueStep(queue, { executionId: step.executionId, stepExecutionId: next.id });
       await record(step.executionId, step.id, 'INFO', 'Next step queued');
-    } else {
+    } else if (finished) {
       await record(step.executionId, null, 'INFO', 'Execution succeeded');
+      await emitExecution(scope, step.executionId, 'SUCCESS');
     }
   }
 
   async function scheduleRetry(
     step: StepRow,
+    scope: Scope,
     attempt: number,
     policy: RetryPolicy,
     failure: Failure,
     durationMs: number,
   ): Promise<void> {
     const delayMs = backoffDelayMs(attempt, policy.backoffBaseMs);
+    const nextRetryAt = new Date(Date.now() + delayMs);
 
     await prisma.stepExecution.update({
       where: { id: step.id },
-      data: {
-        status: 'RETRYING',
-        error: failure.error,
-        nextRetryAt: new Date(Date.now() + delayMs),
-        durationMs,
-      },
+      data: { status: 'RETRYING', error: failure.error, nextRetryAt, durationMs },
     });
-
     await record(
       step.executionId,
       step.id,
@@ -244,6 +278,7 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
       `Step "${step.name}" failed on attempt ${attempt} of ${policy.maxAttempts}: ${failure.error}. Retrying in ${(delayMs / 1000).toFixed(1)}s`,
       { attempt, delayMs },
     );
+    await emitStep(scope, step, 'RETRYING', attempt, nextRetryAt);
 
     await enqueueRetry(
       queue,
@@ -255,6 +290,7 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
 
   async function failStep(
     step: StepRow,
+    scope: Scope,
     attempt: number,
     failure: Failure,
     reason: DeadLetterReason,
@@ -265,7 +301,7 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
         ? `Step "${step.name}" failed after ${attempt} attempts: ${failure.error}`
         : `Step "${step.name}" failed: ${failure.error}`;
 
-    await markStepFailed(prisma, {
+    const executionFailed = await markStepFailed(prisma, {
       stepId: step.id,
       executionId: step.executionId,
       position: step.position,
@@ -273,9 +309,12 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
       summary,
       durationMs,
     });
-
     await record(step.executionId, step.id, 'ERROR', summary, { attempt, reason });
-    await record(step.executionId, null, 'ERROR', 'Execution failed');
+    await emitStep(scope, step, 'FAILED', attempt, null);
+    if (executionFailed) {
+      await record(step.executionId, null, 'ERROR', 'Execution failed');
+      await emitExecution(scope, step.executionId, 'FAILED');
+    }
 
     try {
       await deadLetterStep(deadLetterQueue, {
@@ -299,11 +338,17 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
       where: { id: stepExecutionId },
       include: {
         execution: {
-          select: { status: true, input: true, maxAttempts: true, backoffBaseMs: true },
+          select: {
+            status: true,
+            input: true,
+            maxAttempts: true,
+            backoffBaseMs: true,
+            userId: true,
+            workflowId: true,
+          },
         },
       },
     });
-
     if (!step || step.executionId !== executionId) {
       logger.warn({ executionId, stepExecutionId }, 'step no longer exists, dropping job');
       return;
@@ -311,15 +356,10 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
 
     if (step.status === 'SUCCESS') {
       const queued = await queueNextStep(executionId, step.position);
-      logger.info(
-        { executionId, stepExecutionId, queued },
-        'step already completed, skipped re-execution',
-      );
+      logger.info({ executionId, stepExecutionId, queued }, 'step already completed, skipped re-execution');
       return;
     }
-
     if (step.status === 'FAILED' || step.status === 'SKIPPED') return;
-
     if (step.execution.status === 'CANCELLED') {
       await prisma.stepExecution.updateMany({
         where: { id: stepExecutionId, status: { in: ['PENDING', 'RETRYING'] } },
@@ -327,9 +367,9 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
       });
       return;
     }
-
     if (step.execution.status !== 'QUEUED' && step.execution.status !== 'RUNNING') return;
 
+    const scope: Scope = { userId: step.execution.userId, workflowId: step.execution.workflowId };
     const input = await resolveInput(executionId, step.position, step.execution.input);
     const attempt = await claimStep(stepExecutionId, input);
     if (attempt === null) return;
@@ -338,23 +378,22 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
       where: { id: executionId, status: 'QUEUED' },
       data: { status: 'RUNNING', startedAt: new Date() },
     });
-
     if (started.count > 0) {
       await record(executionId, null, 'INFO', 'Execution started', { workerId });
+      await emitExecution(scope, executionId, 'RUNNING');
     }
+    await emitStep(scope, step, 'RUNNING', attempt, null);
 
     const policy: RetryPolicy = {
       maxAttempts: step.execution.maxAttempts,
       backoffBaseMs: step.execution.backoffBaseMs,
     };
-
     const ctx: StepContext = {
       stepExecutionId,
       attempt,
       allowPrivateNetwork,
       log: (level, message, meta) => record(executionId, stepExecutionId, level, message, meta),
     };
-
     await ctx.log('INFO', `Step "${step.name}" started`, {
       attempt,
       maxAttempts: policy.maxAttempts,
@@ -366,22 +405,20 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
     const durationMs = Date.now() - startedAtMs;
 
     if (outcome.ok) {
-      await completeStep(step, attempt, outcome.output, durationMs);
+      await completeStep(step, scope, attempt, outcome.output, durationMs);
       observer?.stepFinished({ type: step.type, outcome: 'success', durationMs });
       return;
     }
-
     const decision = decideFailure({
       retryable: outcome.retryable,
       attempt,
       maxAttempts: policy.maxAttempts,
     });
-
     if (decision.action === 'retry') {
-      await scheduleRetry(step, attempt, policy, outcome, durationMs);
+      await scheduleRetry(step, scope, attempt, policy, outcome, durationMs);
       observer?.stepFinished({ type: step.type, outcome: 'retry', durationMs });
     } else {
-      await failStep(step, attempt, outcome, decision.reason, durationMs);
+      await failStep(step, scope, attempt, outcome, decision.reason, durationMs);
       observer?.stepFinished({ type: step.type, outcome: 'failed', durationMs });
     }
   };

@@ -5,7 +5,14 @@ import { env } from '../config/env.js';
 import { safeEqual } from '../lib/crypto.js';
 import { UnauthorizedError } from '../lib/errors.js';
 
-const QUEUE_STATES = ['waiting', 'active', 'delayed', 'prioritized', 'completed', 'failed'] as const;
+const QUEUE_STATES = [
+  'waiting',
+  'active',
+  'delayed',
+  'prioritized',
+  'completed',
+  'failed',
+] as const;
 
 export function registerMetrics(app: FastifyInstance): void {
   const registry = new Registry();
@@ -59,7 +66,10 @@ export function registerMetrics(app: FastifyInstance): void {
         const counts = await app.deadLetterQueue.getJobCounts('waiting');
         this.set(counts.waiting ?? 0);
       } catch (err) {
-        app.log.warn({ err }, 'could not read the dead-letter queue for metrics');
+        app.log.warn(
+          { err },
+          'could not read the dead-letter queue for metrics',
+        );
       }
     },
   });
@@ -83,6 +93,15 @@ export function registerMetrics(app: FastifyInstance): void {
       } catch (err) {
         app.log.warn({ err }, 'could not read workers for metrics');
       }
+    },
+  });
+
+  new Gauge({
+    name: 'cloudflow_sse_clients',
+    help: 'Open real-time event streams',
+    registers: [registry],
+    collect() {
+      this.set(app.eventHub.size);
     },
   });
 

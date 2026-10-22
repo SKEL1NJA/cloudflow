@@ -1,6 +1,8 @@
 import { createPrismaClient } from '@cloudflow/db';
 import {
   createDeadLetterQueue,
+  createEventPublisher,
+  createRedisClient,
   createStepQueue,
   createStepWorker,
   startHeartbeat,
@@ -9,7 +11,11 @@ import {
 import os from 'node:os';
 import { env } from './config/env.js';
 import { logger } from './logger.js';
-import { createWorkerMetrics, startMetricsServer, type MetricsServer } from './metrics.js';
+import {
+  createWorkerMetrics,
+  startMetricsServer,
+  type MetricsServer,
+} from './metrics.js';
 import { createStepProcessor } from './processor.js';
 import { startReconciler } from './reconciler.js';
 import { startMaintenance } from './maintenance.js';
@@ -19,6 +25,15 @@ const workerId = `worker-${os.hostname()}-${process.pid}`;
 const prisma = createPrismaClient(env.DATABASE_URL);
 const queue = createStepQueue(env.REDIS_URL);
 const deadLetterQueue = createDeadLetterQueue(env.REDIS_URL);
+
+const eventsRedis = createRedisClient(env.REDIS_URL);
+eventsRedis.on('error', (err) =>
+  logger.warn({ err }, 'events connection error'),
+);
+
+const events = createEventPublisher(eventsRedis, (err) =>
+  logger.warn({ err }, 'could not publish event'),
+);
 
 queue.on('error', (err) => logger.warn({ err }, 'queue connection error'));
 deadLetterQueue.on('error', (err) =>
@@ -48,6 +63,7 @@ const processor = createStepProcessor({
   prisma,
   queue,
   deadLetterQueue,
+  events,
   workerId,
   logger,
   allowPrivateNetwork: env.HTTP_ALLOW_PRIVATE_NETWORK,
@@ -93,7 +109,14 @@ const heartbeat = startHeartbeat({
 const reconciler =
   env.RECONCILER_INTERVAL_MS > 0
     ? startReconciler(
-        { prisma, queue, deadLetterQueue, logger, onRecovery: metrics.countRecovery },
+        {
+          prisma,
+          queue,
+          deadLetterQueue,
+          logger,
+          events,
+          onRecovery: metrics.countRecovery,
+        },
         {
           graceMs: env.RECONCILER_GRACE_MS,
           stuckRunningMs: env.RECONCILER_STUCK_RUNNING_MS,
@@ -118,13 +141,22 @@ if (env.WORKER_METRICS_PORT > 0) {
       env.WORKER_METRICS_PORT,
       env.WORKER_METRICS_HOST,
     );
-    logger.info({ port: env.WORKER_METRICS_PORT }, 'metrics server listening');
+    logger.info(
+      { port: env.WORKER_METRICS_PORT },
+      'metrics server listening',
+    );
   } catch (err) {
-    logger.warn({ err }, 'metrics server could not start, continuing without it');
+    logger.warn(
+      { err },
+      'metrics server could not start, continuing without it',
+    );
   }
 }
 
-logger.info({ workerId, concurrency: env.WORKER_CONCURRENCY }, 'worker started');
+logger.info(
+  { workerId, concurrency: env.WORKER_CONCURRENCY },
+  'worker started',
+);
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutting down, waiting for active jobs to finish');
@@ -132,6 +164,7 @@ async function shutdown(signal: string): Promise<void> {
   await maintenance?.stop();
   await worker.close();
   await heartbeat.stop();
+  eventsRedis.disconnect();
   await metricsServer?.close();
   await queue.close();
   await deadLetterQueue.close();

@@ -10,4 +10,5 @@ export const RULES = {
   invalidApiKeys: { name: 'api-key-fail', max: 30, windowSeconds: 900 },
   runWorkflow: { name: 'run-workflow', max: 60, windowSeconds: 60 },
   createApiKey: { name: 'create-api-key', max: 10, windowSeconds: 3600 },
+  eventTicket: { name: 'event-ticket', max: 10, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;

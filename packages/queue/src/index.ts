@@ -3,6 +3,7 @@ import { parseRedisUrl } from './redis.js';
 
 export * from './redis.js';
 export * from './workers.js';
+export * from './events.js';
 
 export const STEP_QUEUE_NAME = 'workflow-steps';
 export const DEAD_LETTER_QUEUE_NAME = 'workflow-steps-dead';

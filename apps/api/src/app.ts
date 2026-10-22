@@ -6,6 +6,7 @@ import { env } from './config/env.js';
 import { safeRequestId } from './lib/request-id.js';
 import { apiKeyRoutes } from './modules/api-keys/api-keys.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { eventRoutes } from './modules/events/events.routes.js';
 import { executionRoutes } from './modules/executions/executions.routes.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { logRoutes } from './modules/logs/logs.routes.js';
@@ -19,6 +20,7 @@ import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerInfrastructure } from './plugins/infrastructure.js';
 import { registerMetrics } from './plugins/metrics.js';
 import { rateLimitPlugin } from './plugins/rate-limit.js';
+import { registerRealtime } from './plugins/realtime.js';
 
 export interface AppOptions {
   rateLimitEnabled?: boolean;
@@ -28,7 +30,11 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
-      redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+      redact: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'res.headers["set-cookie"]',
+      ],
       ...(env.NODE_ENV === 'development' && {
         transport: {
           target: 'pino-pretty',
@@ -49,8 +55,15 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   });
 
   app.addHook('onSend', async (_request, reply, payload) => {
-    if (String(reply.getHeader('content-type') ?? '').startsWith('application/json')) {
-      reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+    if (
+      String(reply.getHeader('content-type') ?? '').startsWith(
+        'application/json',
+      )
+    ) {
+      reply.header(
+        'content-security-policy',
+        "default-src 'none'; frame-ancestors 'none'",
+      );
     }
     return payload;
   });
@@ -59,19 +72,29 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: 'same-site' },
   });
+
   void app.register(cors, {
     origin: env.CORS_ORIGINS,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['authorization', 'content-type', 'idempotency-key'],
-    exposedHeaders: ['x-request-id', 'retry-after', 'ratelimit-limit', 'ratelimit-remaining'],
+    exposedHeaders: [
+      'x-request-id',
+      'retry-after',
+      'ratelimit-limit',
+      'ratelimit-remaining',
+    ],
     maxAge: 600,
   });
+
   void app.register(cookie);
 
   registerErrorHandler(app);
   registerInfrastructure(app);
-  void app.register(rateLimitPlugin, { enabled: options.rateLimitEnabled ?? env.RATE_LIMIT_ENABLED });
+  registerRealtime(app);
+  void app.register(rateLimitPlugin, {
+    enabled: options.rateLimitEnabled ?? env.RATE_LIMIT_ENABLED,
+  });
   registerAuth(app);
   registerMetrics(app);
 
@@ -84,6 +107,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   void app.register(workerRoutes);
   void app.register(logRoutes);
   void app.register(apiKeyRoutes);
+  void app.register(eventRoutes);
 
   if (env.DOCS_ENABLED ?? env.NODE_ENV !== 'production') {
     registerDocs(app);

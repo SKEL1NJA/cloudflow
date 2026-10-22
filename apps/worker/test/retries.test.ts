@@ -47,6 +47,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await waitFor(async () => ((await queue.getActiveCount()) === 0 ? true : null));
   await queue.obliterate({ force: true });
   await deadLetterQueue.obliterate({ force: true });
   await prisma.user.deleteMany();
@@ -120,8 +121,10 @@ describe('retries', () => {
     expect(steps[0]?.attempts).toBe(3);
     expect(server.seen).toHaveLength(3);
 
-    const dead = await deadLetterQueue.getJob(`${stepIds[0]}-dead`);
-    expect(dead?.data).toMatchObject({
+    const dead = await waitFor(
+      async () => (await deadLetterQueue.getJob(`${stepIds[0]}-dead`)) ?? null,
+    );
+    expect(dead.data).toMatchObject({
       executionId,
       stepExecutionId: stepIds[0],
       reason: 'RETRIES_EXHAUSTED',
@@ -144,8 +147,10 @@ describe('retries', () => {
     const step = await prisma.stepExecution.findUniqueOrThrow({ where: { id: stepIds[0] as string } });
     expect(step.attempts).toBe(1);
 
-    const dead = await deadLetterQueue.getJob(`${stepIds[0]}-dead`);
-    expect(dead?.data.reason).toBe('NON_RETRYABLE');
+    const dead = await waitFor(
+      async () => (await deadLetterQueue.getJob(`${stepIds[0]}-dead`)) ?? null,
+    );
+    expect(dead.data.reason).toBe('NON_RETRYABLE');
   });
 
   it('exposes the RETRYING state with the time of the next attempt', async () => {
