@@ -39,15 +39,15 @@ describe('computeWorkerStatus', () => {
 
   it('turns offline once the heartbeat is stale, even if it was busy', () => {
     const stale = ago(WORKER_STALE_AFTER_MS + 1);
-    expect(
-      computeWorkerStatus({ lastHeartbeat: stale, stopped: false, processing: 3 }, now),
-    ).toBe('offline');
+    expect(computeWorkerStatus({ lastHeartbeat: stale, stopped: false, processing: 3 }, now)).toBe(
+      'offline',
+    );
   });
 
   it('is offline after a clean shutdown', () => {
-    expect(
-      computeWorkerStatus({ lastHeartbeat: ago(10), stopped: true, processing: 0 }, now),
-    ).toBe('offline');
+    expect(computeWorkerStatus({ lastHeartbeat: ago(10), stopped: true, processing: 0 }, now)).toBe(
+      'offline',
+    );
   });
 });
 
@@ -103,9 +103,7 @@ describe('heartbeat', () => {
 
     const workers = await listWorkers(redis);
 
-    expect(workers.every((worker) => worker.workerId.startsWith('garbage-') === false)).toBe(
-      true,
-    );
+    expect(workers.every((worker) => worker.workerId.startsWith('garbage-') === false)).toBe(true);
 
     await redis.del(key);
   });

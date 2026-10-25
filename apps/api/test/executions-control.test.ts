@@ -77,7 +77,9 @@ describe('POST /executions/:id/cancel', () => {
 
     const res = await post(`/executions/${execution.id}/cancel`, otherToken);
     expect(res.statusCode).toBe(404);
-    const after = await app.prisma.workflowExecution.findUniqueOrThrow({ where: { id: execution.id } });
+    const after = await app.prisma.workflowExecution.findUniqueOrThrow({
+      where: { id: execution.id },
+    });
     expect(after.status).toBe('QUEUED');
   });
 });

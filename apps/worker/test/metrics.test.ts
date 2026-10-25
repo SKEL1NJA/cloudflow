@@ -4,7 +4,9 @@ import { createWorkerMetrics } from '../src/metrics.js';
 function line(text: string, name: string, ...fragments: string[]): string | undefined {
   return text
     .split('\n')
-    .find((entry) => entry.startsWith(name) && fragments.every((fragment) => entry.includes(fragment)));
+    .find(
+      (entry) => entry.startsWith(name) && fragments.every((fragment) => entry.includes(fragment)),
+    );
 }
 
 describe('worker metrics', () => {
@@ -16,10 +18,16 @@ describe('worker metrics', () => {
     metrics.countRecovery('pending_not_queued');
 
     const text = await metrics.registry.metrics();
-    expect(line(text, 'cloudflow_step_attempts_total', 'type="DELAY"', 'outcome="success"')).toMatch(/ 2$/);
-    expect(line(text, 'cloudflow_step_attempts_total', 'type="HTTP_REQUEST"', 'outcome="retry"')).toMatch(/ 1$/);
+    expect(
+      line(text, 'cloudflow_step_attempts_total', 'type="DELAY"', 'outcome="success"'),
+    ).toMatch(/ 2$/);
+    expect(
+      line(text, 'cloudflow_step_attempts_total', 'type="HTTP_REQUEST"', 'outcome="retry"'),
+    ).toMatch(/ 1$/);
     expect(line(text, 'cloudflow_step_duration_seconds_count', 'type="DELAY"')).toMatch(/ 2$/);
-    expect(line(text, 'cloudflow_reconciler_recoveries_total', 'reason="pending_not_queued"')).toMatch(/ 1$/);
+    expect(
+      line(text, 'cloudflow_reconciler_recoveries_total', 'reason="pending_not_queued"'),
+    ).toMatch(/ 1$/);
     expect(line(text, 'cloudflow_worker_jobs_processing')).toMatch(/ 2$/);
   });
 });

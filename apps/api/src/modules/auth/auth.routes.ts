@@ -5,7 +5,12 @@ import { ConflictError, RateLimitError, UnauthorizedError } from '../../lib/erro
 import { RULES } from '../../lib/rate-limit-rules.js';
 import { requireUserId } from '../../plugins/auth.js';
 import { loginSchema, registerSchema } from './auth.schemas.js';
-import { REFRESH_COOKIE, assertTrustedOrigin, clearRefreshCookie, setRefreshCookie } from './cookies.js';
+import {
+  REFRESH_COOKIE,
+  assertTrustedOrigin,
+  clearRefreshCookie,
+  setRefreshCookie,
+} from './cookies.js';
 import { burnPasswordCheck, hashPassword, verifyPassword } from './password.js';
 import { revokeAllSessions, revokeSession, rotateSession, startSession } from './sessions.js';
 import { signAccessToken } from './tokens.js';

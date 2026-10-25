@@ -68,7 +68,11 @@ export async function getOverview(
     }),
     prisma.workflowExecution.groupBy({
       by: ['status'],
-      where: { userId, createdAt: { gte: since }, status: { in: ['SUCCESS', 'FAILED', 'CANCELLED'] } },
+      where: {
+        userId,
+        createdAt: { gte: since },
+        status: { in: ['SUCCESS', 'FAILED', 'CANCELLED'] },
+      },
       _count: { _all: true },
     }),
     checkInfrastructure(deps, log),

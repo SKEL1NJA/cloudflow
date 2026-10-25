@@ -16,7 +16,10 @@ function readStored(): ThemePreference {
 }
 
 function systemPrefersDark(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
 }
 
 let preference: ThemePreference = readStored();
@@ -60,11 +63,9 @@ export function useThemePreference(): ThemePreference {
 }
 
 if (typeof window.matchMedia === 'function') {
-  window
-    .matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => {
-      if (preference === 'system') emit();
-    });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (preference === 'system') emit();
+  });
 }
 
 apply();

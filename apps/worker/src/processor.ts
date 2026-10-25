@@ -80,8 +80,16 @@ function classifyError(err: unknown): Failure {
 }
 
 export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
-  const { prisma, queue, deadLetterQueue, workerId, logger, allowPrivateNetwork, observer, events } =
-    deps;
+  const {
+    prisma,
+    queue,
+    deadLetterQueue,
+    workerId,
+    logger,
+    allowPrivateNetwork,
+    observer,
+    events,
+  } = deps;
 
   async function record(
     executionId: string,
@@ -106,7 +114,11 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
     }
   }
 
-  function emitExecution(scope: Scope, executionId: string, status: ExecutionStatus): Promise<void> {
+  function emitExecution(
+    scope: Scope,
+    executionId: string,
+    status: ExecutionStatus,
+  ): Promise<void> {
     return (
       events?.publish({
         type: 'execution.updated',
@@ -356,7 +368,10 @@ export function createStepProcessor(deps: ProcessorDeps): StepProcessor {
 
     if (step.status === 'SUCCESS') {
       const queued = await queueNextStep(executionId, step.position);
-      logger.info({ executionId, stepExecutionId, queued }, 'step already completed, skipped re-execution');
+      logger.info(
+        { executionId, stepExecutionId, queued },
+        'step already completed, skipped re-execution',
+      );
       return;
     }
     if (step.status === 'FAILED' || step.status === 'SKIPPED') return;

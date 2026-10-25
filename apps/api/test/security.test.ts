@@ -25,7 +25,9 @@ describe('security headers', () => {
     expect(res.headers['referrer-policy']).toBe('no-referrer');
     expect(res.headers['cross-origin-resource-policy']).toBe('same-site');
     expect(res.headers['strict-transport-security']).toBeDefined();
-    expect(res.headers['content-security-policy']).toBe("default-src 'none'; frame-ancestors 'none'");
+    expect(res.headers['content-security-policy']).toBe(
+      "default-src 'none'; frame-ancestors 'none'",
+    );
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
 
@@ -62,7 +64,11 @@ describe('CORS', () => {
   });
 
   it('exposes the headers the frontend needs on real responses', async () => {
-    const res = await app.inject({ method: 'GET', url: '/health', headers: { origin: ALLOWED_ORIGIN } });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: ALLOWED_ORIGIN },
+    });
     expect(res.headers['access-control-allow-origin']).toBe(ALLOWED_ORIGIN);
     expect(String(res.headers['access-control-expose-headers'])).toContain('x-request-id');
   });
@@ -82,13 +88,21 @@ describe('request limits', () => {
 
 describe('request ids', () => {
   it('reuses a well-formed client id', async () => {
-    const res = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': 'client-id-123' } });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { 'x-request-id': 'client-id-123' },
+    });
     expect(res.headers['x-request-id']).toBe('client-id-123');
   });
 
   it('replaces malformed or oversized ids', async () => {
     const huge = 'x'.repeat(200);
-    const res = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': huge } });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { 'x-request-id': huge },
+    });
     expect(res.headers['x-request-id']).not.toBe(huge);
     expect(String(res.headers['x-request-id'])).toMatch(/^[0-9a-f-]{36}$/);
   });

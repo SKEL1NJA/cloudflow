@@ -110,9 +110,17 @@ describe('lost publishes (the dual-write problem)', () => {
 
   it('skips the pass when the queue is too deep to scan', async () => {
     const { stepIds } = await seedExecution(prisma, [notify('One')]);
-    await queue.add('step', { executionId: 'other', stepExecutionId: 'other-step' }, { jobId: 'other-step' });
+    await queue.add(
+      'step',
+      { executionId: 'other', stepExecutionId: 'other-step' },
+      { jobId: 'other-step' },
+    );
 
-    const result = await reconcileOnce(deps, { ...options, maxLiveJobsScanned: 0 }, later(61 * SECOND));
+    const result = await reconcileOnce(
+      deps,
+      { ...options, maxLiveJobsScanned: 0 },
+      later(61 * SECOND),
+    );
 
     expect(result).toMatchObject({ checked: 1, recovered: 0, skipped: 1 });
     expect(await recoveryJobs(stepIds[0] as string)).toHaveLength(0);
@@ -120,7 +128,10 @@ describe('lost publishes (the dual-write problem)', () => {
 
   it('ignores steps of executions that already finished', async () => {
     const { executionId } = await seedExecution(prisma, [notify('One')]);
-    await prisma.workflowExecution.update({ where: { id: executionId }, data: { status: 'FAILED' } });
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'FAILED' },
+    });
     const result = await reconcileOnce(deps, options, later(5 * MINUTE));
     expect(result.checked).toBe(0);
   });
@@ -134,7 +145,10 @@ describe('stalled chains and lost retries', () => {
       where: { id: first },
       data: { status: 'SUCCESS', attempts: 1, finishedAt: new Date() },
     });
-    await prisma.workflowExecution.update({ where: { id: executionId }, data: { status: 'RUNNING' } });
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'RUNNING' },
+    });
 
     const result = await reconcileOnce(deps, options, later(61 * SECOND));
 
@@ -150,7 +164,10 @@ describe('stalled chains and lost retries', () => {
       where: { id: step },
       data: { status: 'RETRYING', attempts: 1, nextRetryAt: new Date(), error: 'HTTP 503' },
     });
-    await prisma.workflowExecution.update({ where: { id: executionId }, data: { status: 'RUNNING' } });
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'RUNNING' },
+    });
 
     const result = await reconcileOnce(deps, options, later(61 * SECOND));
 
@@ -167,7 +184,10 @@ describe('lost workers', () => {
       where: { id: step },
       data: { status: 'RUNNING', attempts: 1, workerId: 'dead-worker', startedAt: new Date() },
     });
-    await prisma.workflowExecution.update({ where: { id: executionId }, data: { status: 'RUNNING' } });
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'RUNNING' },
+    });
 
     const early = await reconcileOnce(deps, options, later(5 * MINUTE));
     expect(early.checked).toBe(0);
@@ -180,25 +200,36 @@ describe('lost workers', () => {
   });
 
   it('fails a step that has used every attempt on dead workers instead of recovering it forever', async () => {
-    const { executionId, stepIds } = await seedExecution(prisma, [notify('Poison'), notify('After')]);
+    const { executionId, stepIds } = await seedExecution(prisma, [
+      notify('Poison'),
+      notify('After'),
+    ]);
     const [step, after] = stepIds as [string, string];
     await prisma.stepExecution.update({
       where: { id: step },
       data: { status: 'RUNNING', attempts: 3, workerId: 'dead-worker', startedAt: new Date() },
     });
-    await prisma.workflowExecution.update({ where: { id: executionId }, data: { status: 'RUNNING' } });
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'RUNNING' },
+    });
 
     const result = await reconcileOnce(deps, options, later(11 * MINUTE));
 
     expect(result).toMatchObject({ recovered: 0, failed: 1 });
     expect(await recoveryJobs(step)).toHaveLength(0);
 
-    const steps = await prisma.stepExecution.findMany({ where: { executionId }, orderBy: { position: 'asc' } });
+    const steps = await prisma.stepExecution.findMany({
+      where: { executionId },
+      orderBy: { position: 'asc' },
+    });
     expect(steps.map((entry) => entry.status)).toEqual(['FAILED', 'SKIPPED']);
     expect(steps[0]?.error).toContain('stopped responding');
     expect(steps[1]?.id).toBe(after);
 
-    const execution = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } });
+    const execution = await prisma.workflowExecution.findUniqueOrThrow({
+      where: { id: executionId },
+    });
     expect(execution.status).toBe('FAILED');
     expect(execution.error).toContain('Poison');
 
@@ -224,7 +255,10 @@ describe('end to end', () => {
     try {
       const execution = await waitForFinish(prisma, executionId);
       expect(execution.status).toBe('SUCCESS');
-      const steps = await prisma.stepExecution.findMany({ where: { executionId }, orderBy: { position: 'asc' } });
+      const steps = await prisma.stepExecution.findMany({
+        where: { executionId },
+        orderBy: { position: 'asc' },
+      });
       expect(steps.map((step) => step.attempts)).toEqual([1, 1]);
     } finally {
       await worker.close();

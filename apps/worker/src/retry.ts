@@ -11,9 +11,7 @@ export function backoffDelayMs(
   return Math.round(exponential * (0.5 + random() * 0.5));
 }
 
-export type FailureDecision =
-  | { action: 'retry' }
-  | { action: 'fail'; reason: DeadLetterReason };
+export type FailureDecision = { action: 'retry' } | { action: 'fail'; reason: DeadLetterReason };
 
 export function decideFailure(input: {
   retryable: boolean;

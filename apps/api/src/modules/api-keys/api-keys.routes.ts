@@ -16,11 +16,7 @@ export const apiKeyRoutes: FastifyPluginAsync = async (app) => {
     { preHandler: app.limiter.byUser(RULES.createApiKey) },
     async (request, reply) => {
       const { name } = createApiKeySchema.parse(request.body);
-      const created = await createApiKey(
-        app.prisma,
-        requireUserId(request),
-        name,
-      );
+      const created = await createApiKey(app.prisma, requireUserId(request), name);
 
       return reply.status(201).header('cache-control', 'no-store').send(created);
     },

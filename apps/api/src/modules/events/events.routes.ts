@@ -51,7 +51,7 @@ export const eventRoutes: FastifyPluginAsync = async (app) => {
     const lastEventId = typeof header === 'string' && header !== '' ? header : query.lastEventId;
 
     reply.hijack();
-    
+
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-cache, no-transform',

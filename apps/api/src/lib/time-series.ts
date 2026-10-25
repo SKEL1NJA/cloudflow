@@ -51,6 +51,9 @@ export function fillSeries<K extends string>(
   return {
     range,
     bucketSeconds,
-    points: [...buckets].map(([start, counts]) => ({ start: new Date(start).toISOString(), counts })),
+    points: [...buckets].map(([start, counts]) => ({
+      start: new Date(start).toISOString(),
+      counts,
+    })),
   };
 }

@@ -131,9 +131,7 @@ describe('POST /workflows/:id/run', () => {
     const res = await run(workflow.id);
 
     expect(res.statusCode).toBe(409);
-    expect(res.json<{ error: { code: string } }>().error.code).toBe(
-      'WORKFLOW_DISABLED',
-    );
+    expect(res.json<{ error: { code: string } }>().error.code).toBe('WORKFLOW_DISABLED');
     expect(await app.prisma.workflowExecution.count()).toBe(0);
     expect(await app.queue.getJobCounts('waiting')).toEqual({ waiting: 0 });
   });
@@ -171,9 +169,7 @@ describe('idempotency keys', () => {
 
     expect(first.statusCode).toBe(202);
     expect(second.statusCode).toBe(200);
-    expect(second.json<ExecutionDetail>().id).toBe(
-      first.json<ExecutionDetail>().id,
-    );
+    expect(second.json<ExecutionDetail>().id).toBe(first.json<ExecutionDetail>().id);
     expect(await app.prisma.workflowExecution.count()).toBe(1);
     expect(await app.queue.getJobCounts('waiting')).toEqual({ waiting: 1 });
   });

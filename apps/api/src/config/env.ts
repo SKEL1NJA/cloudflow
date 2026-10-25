@@ -9,7 +9,10 @@ if (existsSync(rootEnvPath)) {
 
 const originsSchema = z.string().transform((value, ctx) => {
   const origins: string[] = [];
-  for (const entry of value.split(',').map((item) => item.trim()).filter(Boolean)) {
+  for (const entry of value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)) {
     try {
       const url = new URL(entry);
       if (!['http:', 'https:'].includes(url.protocol) || url.origin !== entry) throw new Error();

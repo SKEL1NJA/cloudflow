@@ -66,10 +66,7 @@ export function registerMetrics(app: FastifyInstance): void {
         const counts = await app.deadLetterQueue.getJobCounts('waiting');
         this.set(counts.waiting ?? 0);
       } catch (err) {
-        app.log.warn(
-          { err },
-          'could not read the dead-letter queue for metrics',
-        );
+        app.log.warn({ err }, 'could not read the dead-letter queue for metrics');
       }
     },
   });
@@ -111,9 +108,7 @@ export function registerMetrics(app: FastifyInstance): void {
       onRequest: async (request) => {
         if (!env.METRICS_TOKEN) return;
 
-        const token = /^Bearer (.+)$/i.exec(
-          request.headers.authorization ?? '',
-        )?.[1];
+        const token = /^Bearer (.+)$/i.exec(request.headers.authorization ?? '')?.[1];
 
         if (!token || !safeEqual(token, env.METRICS_TOKEN)) {
           throw new UnauthorizedError();
@@ -121,9 +116,7 @@ export function registerMetrics(app: FastifyInstance): void {
       },
     },
     async (_request, reply) => {
-      return reply
-        .header('content-type', registry.contentType)
-        .send(await registry.metrics());
+      return reply.header('content-type', registry.contentType).send(await registry.metrics());
     },
   );
 

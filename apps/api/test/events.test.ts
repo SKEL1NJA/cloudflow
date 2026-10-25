@@ -4,7 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { MAX_STREAMS_PER_USER, compareStreamIds } from '../src/modules/events/event-hub.js';
-import { authHeader, createWorkflow, registerUser, registerUserWithId, waitFor } from './helpers.js';
+import {
+  authHeader,
+  createWorkflow,
+  registerUser,
+  registerUserWithId,
+  waitFor,
+} from './helpers.js';
 import { openStream, type SseStream } from './sse.js';
 
 let app: FastifyInstance;
@@ -36,7 +42,10 @@ afterEach(async () => {
 });
 
 async function connect(headers: Record<string, string> = {}, query = ''): Promise<SseStream> {
-  const stream = await openStream(`${baseUrl}/events${query}`, { ...authHeader(token), ...headers });
+  const stream = await openStream(`${baseUrl}/events${query}`, {
+    ...authHeader(token),
+    ...headers,
+  });
   streams.push(stream);
   return stream;
 }
@@ -94,7 +103,11 @@ describe('authentication and tickets', () => {
   });
 
   it('accepts a ticket exactly once and never stores it in plain text', async () => {
-    const res = await app.inject({ method: 'POST', url: '/events/ticket', headers: authHeader(token) });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/events/ticket',
+      headers: authHeader(token),
+    });
     expect(res.statusCode).toBe(200);
     const { ticket, expiresInSeconds } = res.json<{ ticket: string; expiresInSeconds: number }>();
     expect(expiresInSeconds).toBe(30);
@@ -114,7 +127,11 @@ describe('authentication and tickets', () => {
   });
 
   it('rejects expired and unknown tickets', async () => {
-    const res = await app.inject({ method: 'POST', url: '/events/ticket', headers: authHeader(token) });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/events/ticket',
+      headers: authHeader(token),
+    });
     const { ticket } = res.json<{ ticket: string }>();
     await app.redis.del(...(await app.redis.keys('cloudflow:sse-ticket:*')));
 
@@ -179,7 +196,10 @@ describe('delivery', () => {
       url: `/executions/${execution.id}/cancel`,
       headers: authHeader(token),
     });
-    expect(payload(await first.next())).toMatchObject({ executionId: execution.id, status: 'CANCELLED' });
+    expect(payload(await first.next())).toMatchObject({
+      executionId: execution.id,
+      status: 'CANCELLED',
+    });
   });
 
   it('does not deliver events to other users', async () => {
@@ -222,13 +242,16 @@ describe('resuming', () => {
     expect(payload(await resumed.next())).toMatchObject({ executionId: missed });
   });
 
-  it.each(['1-0', 'garbage'])('asks the client to refetch when the last id is %s', async (lastId) => {
-    const stream = await connect({ 'last-event-id': lastId });
-    expect((await stream.next()).event).toBe('resync');
+  it.each(['1-0', 'garbage'])(
+    'asks the client to refetch when the last id is %s',
+    async (lastId) => {
+      const stream = await connect({ 'last-event-id': lastId });
+      expect((await stream.next()).event).toBe('resync');
 
-    const live = await publish(userId);
-    expect(payload(await stream.next())).toMatchObject({ executionId: live });
-  });
+      const live = await publish(userId);
+      expect(payload(await stream.next())).toMatchObject({ executionId: live });
+    },
+  );
 });
 
 describe('limits and cleanup', () => {

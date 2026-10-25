@@ -94,7 +94,13 @@ async function toApiError(response: Response): Promise<ApiError> {
       requestId,
     );
   } catch {
-    return new ApiError(response.status, 'UNKNOWN', response.statusText || 'Request failed', undefined, requestId);
+    return new ApiError(
+      response.status,
+      'UNKNOWN',
+      response.statusText || 'Request failed',
+      undefined,
+      requestId,
+    );
   }
 }
 
@@ -105,7 +111,11 @@ async function parseBody<T>(response: Response): Promise<T> {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new ApiError(response.status, 'INVALID_RESPONSE', 'The server sent an unreadable response');
+    throw new ApiError(
+      response.status,
+      'INVALID_RESPONSE',
+      'The server sent an unreadable response',
+    );
   }
 }
 

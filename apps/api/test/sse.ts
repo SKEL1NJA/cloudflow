@@ -24,7 +24,8 @@ function parseFrame(raw: string): SseFrame | null {
     const value = index === -1 ? '' : line.slice(index + 1).replace(/^ /, '');
     if (field === 'id') frame.id = value;
     else if (field === 'event') frame.event = value;
-    else if (field === 'data') frame.data = frame.data === undefined ? value : `${frame.data}\n${value}`;
+    else if (field === 'data')
+      frame.data = frame.data === undefined ? value : `${frame.data}\n${value}`;
   }
   return frame.event === undefined && frame.data === undefined ? null : frame;
 }

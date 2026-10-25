@@ -45,7 +45,9 @@ describe('POST /auth/register', () => {
 
   it('stores an Argon2id hash, never the plaintext password', async () => {
     await register();
-    const stored = await app.prisma.user.findUniqueOrThrow({ where: { email: 'uday@example.com' } });
+    const stored = await app.prisma.user.findUniqueOrThrow({
+      where: { email: 'uday@example.com' },
+    });
     expect(stored.passwordHash).toMatch(/^\$argon2id\$/);
     expect(stored.passwordHash).not.toContain('correct-horse-battery');
   });

@@ -42,12 +42,10 @@ export async function getStepActivity(
       AND s.status IN ('SUCCESS', 'FAILED')
     GROUP BY 1, 2`;
 
-  const buckets = rows.map(
-    (row): BucketRow<StepActivityKey> => ({
-      bucket: row.bucket,
-      key: row.status === 'SUCCESS' ? 'succeeded' : 'failed',
-      count: Number(row.count),
-    }),
-  );
+  const buckets = rows.map((row): BucketRow<StepActivityKey> => ({
+    bucket: row.bucket,
+    key: row.status === 'SUCCESS' ? 'succeeded' : 'failed',
+    count: Number(row.count),
+  }));
   return fillSeries(range, ACTIVITY_KEYS, buckets, now);
 }

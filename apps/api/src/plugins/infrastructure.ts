@@ -36,9 +36,7 @@ export function registerInfrastructure(app: FastifyInstance): void {
   app.decorate('queue', queue);
 
   const deadLetterQueue = createDeadLetterQueue(env.REDIS_URL);
-  deadLetterQueue.on('error', (err) =>
-    app.log.warn({ err }, 'dead-letter queue connection error'),
-  );
+  deadLetterQueue.on('error', (err) => app.log.warn({ err }, 'dead-letter queue connection error'));
   app.decorate('deadLetterQueue', deadLetterQueue);
 
   app.addHook('onClose', async () => {

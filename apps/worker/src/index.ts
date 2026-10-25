@@ -11,11 +11,7 @@ import {
 import os from 'node:os';
 import { env } from './config/env.js';
 import { logger } from './logger.js';
-import {
-  createWorkerMetrics,
-  startMetricsServer,
-  type MetricsServer,
-} from './metrics.js';
+import { createWorkerMetrics, startMetricsServer, type MetricsServer } from './metrics.js';
 import { createStepProcessor } from './processor.js';
 import { startReconciler } from './reconciler.js';
 import { startMaintenance } from './maintenance.js';
@@ -27,25 +23,19 @@ const queue = createStepQueue(env.REDIS_URL);
 const deadLetterQueue = createDeadLetterQueue(env.REDIS_URL);
 
 const eventsRedis = createRedisClient(env.REDIS_URL);
-eventsRedis.on('error', (err) =>
-  logger.warn({ err }, 'events connection error'),
-);
+eventsRedis.on('error', (err) => logger.warn({ err }, 'events connection error'));
 
 const events = createEventPublisher(eventsRedis, (err) =>
   logger.warn({ err }, 'could not publish event'),
 );
 
 queue.on('error', (err) => logger.warn({ err }, 'queue connection error'));
-deadLetterQueue.on('error', (err) =>
-  logger.warn({ err }, 'dead-letter queue connection error'),
-);
+deadLetterQueue.on('error', (err) => logger.warn({ err }, 'dead-letter queue connection error'));
 
 await queue.waitUntilReady();
 
 if (env.HTTP_ALLOW_PRIVATE_NETWORK) {
-  logger.warn(
-    'HTTP_ALLOW_PRIVATE_NETWORK is on, HTTP steps can reach private network addresses',
-  );
+  logger.warn('HTTP_ALLOW_PRIVATE_NETWORK is on, HTTP steps can reach private network addresses');
 }
 
 const stats = { processing: 0, completed: 0, failed: 0 };
@@ -79,19 +69,11 @@ const trackedProcessor: StepProcessor = async (job) => {
   }
 };
 
-const worker = createStepWorker(
-  env.REDIS_URL,
-  trackedProcessor,
-  env.WORKER_CONCURRENCY,
-);
+const worker = createStepWorker(env.REDIS_URL, trackedProcessor, env.WORKER_CONCURRENCY);
 
 worker.on('error', (err) => logger.warn({ err }, 'worker error'));
-worker.on('failed', (job, err) =>
-  logger.error({ jobId: job?.id, err }, 'job failed'),
-);
-worker.on('stalled', (jobId) =>
-  logger.warn({ jobId }, 'job stalled and will be redelivered'),
-);
+worker.on('failed', (job, err) => logger.error({ jobId: job?.id, err }, 'job failed'));
+worker.on('stalled', (jobId) => logger.warn({ jobId }, 'job stalled and will be redelivered'));
 
 const heartbeat = startHeartbeat({
   redisUrl: env.REDIS_URL,
@@ -141,22 +123,13 @@ if (env.WORKER_METRICS_PORT > 0) {
       env.WORKER_METRICS_PORT,
       env.WORKER_METRICS_HOST,
     );
-    logger.info(
-      { port: env.WORKER_METRICS_PORT },
-      'metrics server listening',
-    );
+    logger.info({ port: env.WORKER_METRICS_PORT }, 'metrics server listening');
   } catch (err) {
-    logger.warn(
-      { err },
-      'metrics server could not start, continuing without it',
-    );
+    logger.warn({ err }, 'metrics server could not start, continuing without it');
   }
 }
 
-logger.info(
-  { workerId, concurrency: env.WORKER_CONCURRENCY },
-  'worker started',
-);
+logger.info({ workerId, concurrency: env.WORKER_CONCURRENCY }, 'worker started');
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutting down, waiting for active jobs to finish');

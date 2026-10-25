@@ -297,8 +297,7 @@ const operations: Operation[] = [
     method: 'get',
     path: '/events',
     tag: 'Real-time',
-    summary:
-      'Open the server-sent events stream, using an Authorization header or a ticket',
+    summary: 'Open the server-sent events stream, using an Authorization header or a ticket',
     access: 'public',
     query: eventStreamQuerySchema,
     success: 200,
@@ -359,22 +358,19 @@ const apiErrorSchema = {
 
 type JsonObject = Record<string, unknown>;
 
-function toJsonSchema(
-  schema: z.ZodType,
-  name: string,
-  components: JsonObject,
-): JsonObject {
-  const { $schema: _schema, $defs, ...rest } = z.toJSONSchema(schema, {
+function toJsonSchema(schema: z.ZodType, name: string, components: JsonObject): JsonObject {
+  const {
+    $schema: _schema,
+    $defs,
+    ...rest
+  } = z.toJSONSchema(schema, {
     io: 'input',
     unrepresentable: 'any',
   }) as JsonObject & { $defs?: JsonObject };
 
   const rewrite = (value: unknown): JsonObject =>
     JSON.parse(
-      JSON.stringify(value).replaceAll(
-        '#/$defs/',
-        `#/components/schemas/${name}_`,
-      ),
+      JSON.stringify(value).replaceAll('#/$defs/', `#/components/schemas/${name}_`),
     ) as JsonObject;
 
   for (const [key, definition] of Object.entries($defs ?? {})) {
@@ -384,11 +380,7 @@ function toJsonSchema(
   return rewrite(rest);
 }
 
-function queryParameters(
-  schema: z.ZodType,
-  name: string,
-  components: JsonObject,
-): JsonObject[] {
+function queryParameters(schema: z.ZodType, name: string, components: JsonObject): JsonObject[] {
   const json = toJsonSchema(schema, name, components) as {
     properties?: Record<string, unknown>;
     required?: string[];
@@ -402,10 +394,7 @@ function queryParameters(
   }));
 }
 
-function describeOperation(
-  operation: Operation,
-  components: JsonObject,
-): JsonObject {
+function describeOperation(operation: Operation, components: JsonObject): JsonObject {
   const id = `${operation.method}_${operation.path}`.replace(/\W+/g, '_');
   const parameters: JsonObject[] = [];
 
@@ -419,9 +408,7 @@ function describeOperation(
   }
 
   if (operation.query) {
-    parameters.push(
-      ...queryParameters(operation.query, `${id}_query`, components),
-    );
+    parameters.push(...queryParameters(operation.query, `${id}_query`, components));
   }
 
   if (operation.idempotencyKey) {
@@ -429,8 +416,7 @@ function describeOperation(
       name: 'Idempotency-Key',
       in: 'header',
       required: false,
-      description:
-        'Repeating a request with the same key returns the original execution',
+      description: 'Repeating a request with the same key returns the original execution',
       schema: { type: 'string', maxLength: 200 },
     });
   }
@@ -462,8 +448,7 @@ function describeOperation(
       security: [{ bearerAuth: [] }],
     }),
     ...(operation.access === 'session' && {
-      description:
-        'Requires a signed-in session. API keys cannot call this endpoint.',
+      description: 'Requires a signed-in session. API keys cannot call this endpoint.',
     }),
     ...(parameters.length > 0 && { parameters }),
     ...(operation.body && {
@@ -471,11 +456,7 @@ function describeOperation(
         required: operation.bodyRequired ?? true,
         content: {
           'application/json': {
-            schema: toJsonSchema(
-              operation.body,
-              `${id}_body`,
-              components,
-            ),
+            schema: toJsonSchema(operation.body, `${id}_body`, components),
           },
         },
       },
@@ -502,9 +483,7 @@ export function buildOpenApiDocument(): JsonObject {
         'Authenticate with Authorization: Bearer <token>, using the access token from /auth/login or an API key that starts with cf_. Request bodies and query parameters are generated from the same schemas the API validates with. Responses are described by status code only.',
     },
     servers: [{ url: '/' }],
-    tags: [...new Set(operations.map((operation) => operation.tag))].map(
-      (name) => ({ name }),
-    ),
+    tags: [...new Set(operations.map((operation) => operation.tag))].map((name) => ({ name })),
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer' },

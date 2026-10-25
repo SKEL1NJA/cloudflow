@@ -9,7 +9,9 @@ if (existsSync(rootEnvPath)) {
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (!testDatabaseUrl?.includes('_test')) {
-  throw new Error('TEST_DATABASE_URL must be set and point at a database whose name contains "_test"');
+  throw new Error(
+    'TEST_DATABASE_URL must be set and point at a database whose name contains "_test"',
+  );
 }
 
 export default defineConfig({

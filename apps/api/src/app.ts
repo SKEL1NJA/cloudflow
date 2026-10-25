@@ -30,11 +30,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
-      redact: [
-        'req.headers.authorization',
-        'req.headers.cookie',
-        'res.headers["set-cookie"]',
-      ],
+      redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
       ...(env.NODE_ENV === 'development' && {
         transport: {
           target: 'pino-pretty',
@@ -55,15 +51,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   });
 
   app.addHook('onSend', async (_request, reply, payload) => {
-    if (
-      String(reply.getHeader('content-type') ?? '').startsWith(
-        'application/json',
-      )
-    ) {
-      reply.header(
-        'content-security-policy',
-        "default-src 'none'; frame-ancestors 'none'",
-      );
+    if (String(reply.getHeader('content-type') ?? '').startsWith('application/json')) {
+      reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
     }
     return payload;
   });
@@ -78,12 +67,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['authorization', 'content-type', 'idempotency-key'],
-    exposedHeaders: [
-      'x-request-id',
-      'retry-after',
-      'ratelimit-limit',
-      'ratelimit-remaining',
-    ],
+    exposedHeaders: ['x-request-id', 'retry-after', 'ratelimit-limit', 'ratelimit-remaining'],
     maxAge: 600,
   });
 

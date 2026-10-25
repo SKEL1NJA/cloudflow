@@ -42,7 +42,11 @@ export async function createApiKey(
 ): Promise<CreatedApiKey> {
   const active = await prisma.apiKey.count({ where: { userId, revokedAt: null } });
   if (active >= MAX_ACTIVE_KEYS) {
-    throw new AppError(409, 'API_KEY_LIMIT', `You can have at most ${MAX_ACTIVE_KEYS} active API keys`);
+    throw new AppError(
+      409,
+      'API_KEY_LIMIT',
+      `You can have at most ${MAX_ACTIVE_KEYS} active API keys`,
+    );
   }
 
   const key = generateApiKey();
@@ -57,7 +61,11 @@ export async function listApiKeys(prisma: PrismaClient, userId: string): Promise
   return rows.map(toView);
 }
 
-export async function revokeApiKey(prisma: PrismaClient, userId: string, id: string): Promise<void> {
+export async function revokeApiKey(
+  prisma: PrismaClient,
+  userId: string,
+  id: string,
+): Promise<void> {
   const { count } = await prisma.apiKey.updateMany({
     where: { id, userId, revokedAt: null },
     data: { revokedAt: new Date() },
@@ -68,7 +76,10 @@ export async function revokeApiKey(prisma: PrismaClient, userId: string, id: str
   }
 }
 
-export async function authenticateApiKey(prisma: PrismaClient, key: string): Promise<string | null> {
+export async function authenticateApiKey(
+  prisma: PrismaClient,
+  key: string,
+): Promise<string | null> {
   const row = await prisma.apiKey.findUnique({
     where: { keyHash: hashApiKey(key) },
     select: { id: true, userId: true, revokedAt: true, lastUsedAt: true },

@@ -23,7 +23,9 @@ afterEach(() => {
 describe('requests', () => {
   it('sends the access token and parses JSON', async () => {
     const fetchMock = mockFetch(() => json(200, { ok: true }));
-    const result = await request<{ ok: boolean }>('/things', { query: { page: 2, skip: undefined } });
+    const result = await request<{ ok: boolean }>('/things', {
+      query: { page: 2, skip: undefined },
+    });
 
     expect(result).toEqual({ ok: true });
     const [url, init] = fetchMock.mock.calls[0] ?? [];
@@ -51,12 +53,21 @@ describe('requests', () => {
 
   it('turns error responses into ApiError with code, message and request id', async () => {
     mockFetch(() =>
-      json(409, { error: { code: 'CONFLICT', message: 'Already exists' } }, { 'x-request-id': 'req-1' }),
+      json(
+        409,
+        { error: { code: 'CONFLICT', message: 'Already exists' } },
+        { 'x-request-id': 'req-1' },
+      ),
     );
     const error = await request('/things').catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 409, code: 'CONFLICT', message: 'Already exists', requestId: 'req-1' });
+    expect(error).toMatchObject({
+      status: 409,
+      code: 'CONFLICT',
+      message: 'Already exists',
+      requestId: 'req-1',
+    });
   });
 
   it('reports network failures as NetworkError', async () => {
@@ -80,7 +91,9 @@ describe('automatic token refresh', () => {
   it('refreshes once on a 401 and retries with the new token', async () => {
     const fetchMock = mockFetch((url, init) => {
       if (url.pathname === '/auth/refresh') return refreshOk('fresh');
-      return headerOf(init, 'authorization') === 'Bearer fresh' ? json(200, { ok: true }) : json(401);
+      return headerOf(init, 'authorization') === 'Bearer fresh'
+        ? json(200, { ok: true })
+        : json(401);
     });
 
     expect(await request('/things')).toEqual({ ok: true });
@@ -102,13 +115,17 @@ describe('automatic token refresh', () => {
         await new Promise((resolve) => setTimeout(resolve, 20));
         return refreshOk('fresh');
       }
-      return headerOf(init, 'authorization') === 'Bearer fresh' ? json(200, { ok: true }) : json(401);
+      return headerOf(init, 'authorization') === 'Bearer fresh'
+        ? json(200, { ok: true })
+        : json(401);
     });
 
     const results = await Promise.all(Array.from({ length: 5 }, () => request('/things')));
 
     expect(results).toHaveLength(5);
-    const refreshCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/auth/refresh'));
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith('/auth/refresh'),
+    );
     expect(refreshCalls).toHaveLength(1);
   });
 
@@ -131,7 +148,9 @@ describe('automatic token refresh', () => {
     release();
     expect(await slow).toBe('slow');
 
-    const refreshCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/auth/refresh'));
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith('/auth/refresh'),
+    );
     expect(refreshCalls).toHaveLength(1);
   });
 
@@ -151,7 +170,9 @@ describe('automatic token refresh', () => {
       json(401, { error: { code: 'UNAUTHORIZED', message: 'Invalid email or password' } }),
     );
 
-    await expect(request('/auth/login', { method: 'POST', body: {}, auth: false })).rejects.toMatchObject({
+    await expect(
+      request('/auth/login', { method: 'POST', body: {}, auth: false }),
+    ).rejects.toMatchObject({
       status: 401,
       message: 'Invalid email or password',
     });
@@ -161,7 +182,10 @@ describe('automatic token refresh', () => {
 
   it('queues refreshes through the Web Locks API when the browser has it', async () => {
     const lockRequest = vi.fn((_name: string, task: () => Promise<unknown>) => task());
-    Object.defineProperty(navigator, 'locks', { value: { request: lockRequest }, configurable: true });
+    Object.defineProperty(navigator, 'locks', {
+      value: { request: lockRequest },
+      configurable: true,
+    });
     mockFetch((url, init) =>
       url.pathname === '/auth/refresh'
         ? refreshOk('fresh')

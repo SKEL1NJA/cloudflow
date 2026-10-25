@@ -18,7 +18,8 @@ function update(next: SessionState): void {
 export const sessionStore = {
   getState: (): SessionState => state,
 
-  getAccessToken: (): string | null => (state.status === 'authenticated' ? state.accessToken : null),
+  getAccessToken: (): string | null =>
+    state.status === 'authenticated' ? state.accessToken : null,
 
   subscribe(listener: Listener): () => void {
     listeners.add(listener);

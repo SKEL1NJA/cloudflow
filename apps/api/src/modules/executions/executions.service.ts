@@ -22,13 +22,8 @@ type ExecutionWithSteps = Prisma.WorkflowExecutionGetPayload<{
   include: typeof detailInclude;
 }>;
 
-function durationOf(
-  startedAt: Date | null,
-  finishedAt: Date | null,
-): number | null {
-  return startedAt && finishedAt
-    ? finishedAt.getTime() - startedAt.getTime()
-    : null;
+function durationOf(startedAt: Date | null, finishedAt: Date | null): number | null {
+  return startedAt && finishedAt ? finishedAt.getTime() - startedAt.getTime() : null;
 }
 
 function iso(date: Date | null): string | null {
@@ -80,24 +75,15 @@ export interface RunResult {
   created: boolean;
 }
 
-function replay(
-  existing: ExecutionWithSteps,
-  workflowId: string,
-): RunResult {
+function replay(existing: ExecutionWithSteps, workflowId: string): RunResult {
   if (existing.workflowId !== workflowId) {
-    throw new ConflictError(
-      'This idempotency key was already used for a different workflow',
-    );
+    throw new ConflictError('This idempotency key was already used for a different workflow');
   }
 
   return { execution: toDetail(existing), created: false };
 }
 
-function findByIdempotencyKey(
-  prisma: PrismaClient,
-  userId: string,
-  idempotencyKey: string,
-) {
+function findByIdempotencyKey(prisma: PrismaClient, userId: string, idempotencyKey: string) {
   return prisma.workflowExecution.findUnique({
     where: { userId_idempotencyKey: { userId, idempotencyKey } },
     include: detailInclude,
@@ -114,11 +100,7 @@ export async function runWorkflow(
   const { prisma, queue, log } = deps;
 
   if (idempotencyKey) {
-    const existing = await findByIdempotencyKey(
-      prisma,
-      userId,
-      idempotencyKey,
-    );
+    const existing = await findByIdempotencyKey(prisma, userId, idempotencyKey);
 
     if (existing) {
       return replay(existing, workflowId);
@@ -137,11 +119,7 @@ export async function runWorkflow(
       });
 
       if (!workflow.enabled) {
-        throw new AppError(
-          409,
-          'WORKFLOW_DISABLED',
-          'This workflow is disabled',
-        );
+        throw new AppError(409, 'WORKFLOW_DISABLED', 'This workflow is disabled');
       }
 
       return tx.workflowExecution.create({
@@ -173,11 +151,7 @@ export async function runWorkflow(
     });
   } catch (err) {
     if (idempotencyKey && isUniqueViolation(err)) {
-      const existing = await findByIdempotencyKey(
-        prisma,
-        userId,
-        idempotencyKey,
-      );
+      const existing = await findByIdempotencyKey(prisma, userId, idempotencyKey);
 
       if (existing) {
         return replay(existing, workflowId);
@@ -199,14 +173,9 @@ export async function runWorkflow(
       stepExecutionId: first.id,
     });
   } catch (err) {
-    log.error(
-      { err, executionId: execution.id },
-      'failed to enqueue first step',
-    );
+    log.error({ err, executionId: execution.id }, 'failed to enqueue first step');
 
-    await prisma.workflowExecution
-      .delete({ where: { id: execution.id } })
-      .catch(() => undefined);
+    await prisma.workflowExecution.delete({ where: { id: execution.id } }).catch(() => undefined);
 
     throw new AppError(
       503,
@@ -319,11 +288,7 @@ export async function cancelExecution(
     if (count === 0) {
       await assertOwned(tx, id, userId);
 
-      throw new AppError(
-        409,
-        'EXECUTION_FINISHED',
-        'This execution has already finished',
-      );
+      throw new AppError(409, 'EXECUTION_FINISHED', 'This execution has already finished');
     }
 
     await tx.stepExecution.updateMany({
@@ -372,11 +337,7 @@ export async function retryExecution(
     }
 
     if (current.status !== 'FAILED') {
-      throw new AppError(
-        409,
-        'EXECUTION_NOT_FAILED',
-        'Only failed executions can be retried',
-      );
+      throw new AppError(409, 'EXECUTION_NOT_FAILED', 'Only failed executions can be retried');
     }
 
     const steps = await tx.stepExecution.findMany({
@@ -393,11 +354,7 @@ export async function retryExecution(
     const first = steps.find((step) => step.status !== 'SUCCESS');
 
     if (!first) {
-      throw new AppError(
-        409,
-        'NOTHING_TO_RETRY',
-        'Every step already succeeded',
-      );
+      throw new AppError(409, 'NOTHING_TO_RETRY', 'Every step already succeeded');
     }
 
     await tx.stepExecution.updateMany({

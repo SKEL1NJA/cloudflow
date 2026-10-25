@@ -27,13 +27,16 @@ describe('runTransform', () => {
   });
 
   it('cannot read inherited properties', () => {
-    expect(() => runTransform({ mappings: [{ target: 'x', source: 'constructor.name' }] }, {})).toThrow(
-      StepError,
-    );
+    expect(() =>
+      runTransform({ mappings: [{ target: 'x', source: 'constructor.name' }] }, {}),
+    ).toThrow(StepError);
   });
 
   it('cannot pollute the prototype through a target key', () => {
-    const output = runTransform({ mappings: [{ target: '__proto__', source: 'a' }] }, { a: { polluted: true } });
+    const output = runTransform(
+      { mappings: [{ target: '__proto__', source: 'a' }] },
+      { a: { polluted: true } },
+    );
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     expect(Object.hasOwn(output as object, '__proto__')).toBe(true);
   });

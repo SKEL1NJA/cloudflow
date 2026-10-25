@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { RequireAnonymous, RequireAuth } from '@/auth/guards';
 import { AppShell } from '@/components/layout/app-shell';
+import { OverviewPage } from '@/features/overview/overview-page';
 import { LoginPage } from '@/pages/login';
 import { NotFoundPage } from '@/pages/not-found';
 import { PlaceholderPage } from '@/pages/placeholder';
@@ -24,40 +25,67 @@ export const router = createBrowserRouter([
           {
             element: <AppShell />,
             children: [
-              {
-                index: true,
-                handle: { title: 'Overview' },
-                element: <PlaceholderPage title="Overview" description="System health and recent activity." />,
-              },
+              { index: true, handle: { title: 'Overview' }, element: <OverviewPage /> },
               {
                 path: 'workflows',
                 handle: { title: 'Workflows' },
-                element: <PlaceholderPage title="Workflows" description="Create and manage your workflows." />,
+                element: (
+                  <PlaceholderPage
+                    title="Workflows"
+                    description="Create and manage your workflows."
+                  />
+                ),
               },
               {
                 path: 'executions',
                 handle: { title: 'Executions' },
-                element: <PlaceholderPage title="Executions" description="Every run, step by step." />,
+                element: (
+                  <PlaceholderPage title="Executions" description="Every run, step by step." />
+                ),
+              },
+              {
+                path: 'executions/:id',
+                handle: { title: 'Execution' },
+                element: (
+                  <PlaceholderPage
+                    title="Execution"
+                    description="Step-by-step details for one run."
+                  />
+                ),
               },
               {
                 path: 'workers',
                 handle: { title: 'Workers' },
-                element: <PlaceholderPage title="Workers" description="Processes that execute your steps." />,
+                element: (
+                  <PlaceholderPage
+                    title="Workers"
+                    description="Processes that execute your steps."
+                  />
+                ),
               },
               {
                 path: 'queue',
                 handle: { title: 'Queue' },
-                element: <PlaceholderPage title="Queue" description="Work waiting to be processed." />,
+                element: (
+                  <PlaceholderPage title="Queue" description="Work waiting to be processed." />
+                ),
               },
               {
                 path: 'logs',
                 handle: { title: 'Logs' },
-                element: <PlaceholderPage title="Logs" description="Search what your workflows did." />,
+                element: (
+                  <PlaceholderPage title="Logs" description="Search what your workflows did." />
+                ),
               },
               {
                 path: 'settings',
                 handle: { title: 'Settings' },
-                element: <PlaceholderPage title="Settings" description="Account, API keys and appearance." />,
+                element: (
+                  <PlaceholderPage
+                    title="Settings"
+                    description="Account, API keys and appearance."
+                  />
+                ),
               },
               { path: '*', handle: { title: 'Not found' }, element: <NotFoundPage /> },
             ],

@@ -49,10 +49,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
       return reply.status(400).send(body);
     }
 
-    const statusCode =
-      error.statusCode && error.statusCode >= 400
-        ? error.statusCode
-        : 500;
+    const statusCode = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
 
     if (statusCode >= 500) {
       request.log.error({ err: error }, 'unhandled error');

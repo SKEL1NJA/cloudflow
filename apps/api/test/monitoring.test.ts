@@ -121,7 +121,10 @@ describe('GET /stats/executions', () => {
       await seedExecution(app, workflow, userId, { status, createdAt: minutesAgo(minutes) });
     }
     const otherWorkflow = await createWorkflow(app, otherToken, { name: 'Other' });
-    await seedExecution(app, otherWorkflow, otherUserId, { status: 'SUCCESS', createdAt: minutesAgo(5) });
+    await seedExecution(app, otherWorkflow, otherUserId, {
+      status: 'SUCCESS',
+      createdAt: minutesAgo(5),
+    });
 
     const series = (await get('/stats/executions?range=1h')).json<TimeSeries<ExecutionSeriesKey>>();
     expect(series.bucketSeconds).toBe(300);
@@ -173,7 +176,8 @@ describe('queue endpoints', () => {
     });
 
     const series = (await get('/queue/activity?range=1h')).json<TimeSeries<StepActivityKey>>();
-    const total = (key: StepActivityKey) => series.points.reduce((sum, point) => sum + point.counts[key], 0);
+    const total = (key: StepActivityKey) =>
+      series.points.reduce((sum, point) => sum + point.counts[key], 0);
     expect(total('succeeded')).toBe(1);
     expect(total('failed')).toBe(1);
   });

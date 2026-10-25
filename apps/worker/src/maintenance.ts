@@ -37,9 +37,12 @@ export function startMaintenance(
 
   function schedule(): void {
     if (stopped) return;
-    timer = setTimeout(() => {
-      inFlight = pass().finally(schedule);
-    }, intervalMs * (0.8 + Math.random() * 0.4));
+    timer = setTimeout(
+      () => {
+        inFlight = pass().finally(schedule);
+      },
+      intervalMs * (0.8 + Math.random() * 0.4),
+    );
   }
 
   schedule();

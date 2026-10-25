@@ -42,7 +42,10 @@ export function LoginPage() {
       footer={
         <>
           No account yet?{' '}
-          <Link to="/register" className="font-medium text-foreground underline-offset-4 hover:underline">
+          <Link
+            to="/register"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
             Create one
           </Link>
         </>
@@ -76,7 +79,9 @@ export function LoginPage() {
           </p>
         ) : null}
         <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
-          {formState.isSubmitting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+          {formState.isSubmitting ? (
+            <LoaderCircle className="animate-spin" aria-hidden="true" />
+          ) : null}
           Sign in
         </Button>
       </form>

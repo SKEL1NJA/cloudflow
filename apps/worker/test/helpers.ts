@@ -55,7 +55,9 @@ export async function waitFor<T>(check: () => Promise<T | null>, timeoutMs = 10_
 
 export async function waitForFinish(prisma: PrismaClient, executionId: string, timeoutMs = 15_000) {
   return waitFor(async () => {
-    const execution = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } });
+    const execution = await prisma.workflowExecution.findUniqueOrThrow({
+      where: { id: executionId },
+    });
     return execution.status === 'QUEUED' || execution.status === 'RUNNING' ? null : execution;
   }, timeoutMs);
 }

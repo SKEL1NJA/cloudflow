@@ -2,7 +2,11 @@ import { vi } from 'vitest';
 
 export type Handler = (url: URL, init: RequestInit) => Response | Promise<Response>;
 
-export function json(status: number, body?: unknown, headers: Record<string, string> = {}): Response {
+export function json(
+  status: number,
+  body?: unknown,
+  headers: Record<string, string> = {},
+): Response {
   if (body === undefined) return new Response(null, { status, headers });
   return new Response(JSON.stringify(body), {
     status,

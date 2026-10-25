@@ -29,7 +29,8 @@ export const workerRoutes: FastifyPluginAsync = async (app) => {
     }
 
     workers.sort(
-      (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || a.startedAt.localeCompare(b.startedAt),
+      (a, b) =>
+        STATUS_RANK[a.status] - STATUS_RANK[b.status] || a.startedAt.localeCompare(b.startedAt),
     );
     return { summary, workers };
   });

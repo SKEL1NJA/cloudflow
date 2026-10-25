@@ -57,7 +57,11 @@ export interface MetricsServer {
   close: () => Promise<void>;
 }
 
-export function startMetricsServer(registry: Registry, port: number, host: string): Promise<MetricsServer> {
+export function startMetricsServer(
+  registry: Registry,
+  port: number,
+  host: string,
+): Promise<MetricsServer> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       if (req.url === '/metrics') {

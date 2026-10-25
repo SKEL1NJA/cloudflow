@@ -83,7 +83,10 @@ export async function enqueueRecovery(
   });
 }
 
-export async function listLiveStepIds(queue: StepQueue, maxJobs: number): Promise<Set<string> | null> {
+export async function listLiveStepIds(
+  queue: StepQueue,
+  maxJobs: number,
+): Promise<Set<string> | null> {
   const states = ['waiting', 'active', 'delayed', 'prioritized'] as const;
   const counts = await queue.getJobCounts(...states);
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
@@ -94,10 +97,7 @@ export async function listLiveStepIds(queue: StepQueue, maxJobs: number): Promis
   return new Set(jobs.flatMap((job) => (job ? [job.data.stepExecutionId] : [])));
 }
 
-export async function deadLetterStep(
-  queue: DeadLetterQueue,
-  data: DeadLetterData,
-): Promise<void> {
+export async function deadLetterStep(queue: DeadLetterQueue, data: DeadLetterData): Promise<void> {
   await queue.add('dead-letter', data, {
     jobId: `${data.stepExecutionId}-dead`,
     attempts: 1,

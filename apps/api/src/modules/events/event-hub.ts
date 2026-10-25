@@ -57,7 +57,7 @@ export class EventHub {
   }
 
   start(): void {
-    this.timer = setInterval(() => this.broadcast(': ping\n\n'), HEARTBEAT_MS);
+    this.timer = setInterval(() => this.broadcast('event: heartbeat\ndata: {}\n\n'), HEARTBEAT_MS);
     this.timer.unref();
   }
 

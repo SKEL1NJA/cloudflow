@@ -6,7 +6,13 @@ import { BlockedAddressError, isBlockedAddress, safeLookup } from './ssrf.js';
 import { StepError, type StepContext } from './types.js';
 
 const MAX_RESPONSE_BYTES = 1024 * 1024;
-const FORBIDDEN_HEADERS = new Set(['host', 'content-length', 'transfer-encoding', 'connection', 'upgrade']);
+const FORBIDDEN_HEADERS = new Set([
+  'host',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'upgrade',
+]);
 const RETRYABLE_STATUSES = new Set([408, 425, 429]);
 
 interface RawResponse {
@@ -60,7 +66,8 @@ function send(url: URL, request: OutgoingRequest): Promise<RawResponse> {
         res.on('error', (err) => reject(failure ?? err));
         res.on('close', () => {
           if (failure) reject(failure);
-          else if (!res.complete) reject(new Error('Connection closed before the response completed'));
+          else if (!res.complete)
+            reject(new Error('Connection closed before the response completed'));
         });
       },
     );
@@ -95,7 +102,8 @@ function toStepError(err: unknown, signal: AbortSignal, timeoutMs: number): Step
   if (err instanceof StepError) return err;
   if (signal.aborted) return new StepError(`Request timed out after ${timeoutMs}ms`, true);
 
-  const code = typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : undefined;
+  const code =
+    typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : undefined;
   const message = err instanceof Error ? err.message : String(err);
   if (code?.startsWith('ERR_INVALID')) return new StepError(`Invalid request: ${message}`, false);
   return new StepError(`Request failed: ${code ? `${code} ` : ''}${message}`, true);

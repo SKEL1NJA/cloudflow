@@ -22,7 +22,9 @@ function useSystemStatus(): Status {
 
   if (query.isSuccess) return 'operational';
   if (query.isError) {
-    return query.error instanceof ApiError && query.error.status === 503 ? 'degraded' : 'unreachable';
+    return query.error instanceof ApiError && query.error.status === 503
+      ? 'degraded'
+      : 'unreachable';
   }
   return 'checking';
 }
@@ -33,7 +35,7 @@ export function SystemStatus({ className }: { className?: string }) {
   return (
     <div role="status" className={cn('flex items-center gap-2', className)}>
       <span className={cn('size-2 rounded-full', dot)} aria-hidden="true" />
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="sr-only text-xs text-muted-foreground sm:not-sr-only">{label}</span>
     </div>
   );
 }

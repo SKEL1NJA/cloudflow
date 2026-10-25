@@ -29,7 +29,10 @@ export function createRateLimiter(
   log: FastifyBaseLogger,
 ): RateLimiter {
   const keyOf = (rule: RateLimitRule, key: string) => `cloudflow:rl:${rule.name}:${key}`;
-  const idle = (rule: RateLimitRule): WindowState => ({ count: 0, retryAfterSeconds: rule.windowSeconds });
+  const idle = (rule: RateLimitRule): WindowState => ({
+    count: 0,
+    retryAfterSeconds: rule.windowSeconds,
+  });
   const retryAfter = (rule: RateLimitRule, ttl: number) => (ttl > 0 ? ttl : rule.windowSeconds);
 
   async function consume(rule: RateLimitRule, key: string): Promise<WindowState> {
@@ -73,7 +76,10 @@ export function createRateLimiter(
     }
   }
 
-  function enforce(rule: RateLimitRule, keyFor: (request: FastifyRequest) => string | null): Enforcer {
+  function enforce(
+    rule: RateLimitRule,
+    keyFor: (request: FastifyRequest) => string | null,
+  ): Enforcer {
     return async (request, reply) => {
       if (!enabled) return;
       const key = keyFor(request);

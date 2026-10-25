@@ -77,16 +77,24 @@ describe('retries', () => {
     server = await startServer((count, res) =>
       count <= 2 ? sendJson(res, 503, { error: 'busy' }) : sendJson(res, 200, { id: 42 }),
     );
-    const { executionId, stepIds } = await seedExecution(prisma, [httpStep(server.url), pickId], undefined, {
-      maxAttempts: 3,
-      backoffBaseMs: 100,
-    });
+    const { executionId, stepIds } = await seedExecution(
+      prisma,
+      [httpStep(server.url), pickId],
+      undefined,
+      {
+        maxAttempts: 3,
+        backoffBaseMs: 100,
+      },
+    );
     await enqueueStep(queue, { executionId, stepExecutionId: stepIds[0] as string });
 
     const execution = await waitForFinish(prisma, executionId);
     expect(execution.status).toBe('SUCCESS');
 
-    const steps = await prisma.stepExecution.findMany({ where: { executionId }, orderBy: { position: 'asc' } });
+    const steps = await prisma.stepExecution.findMany({
+      where: { executionId },
+      orderBy: { position: 'asc' },
+    });
     expect(steps[0]?.status).toBe('SUCCESS');
     expect(steps[0]?.attempts).toBe(3);
     expect(steps[0]?.error).toBeNull();
@@ -105,10 +113,15 @@ describe('retries', () => {
 
   it('gives up after maxAttempts, skips the rest and dead-letters the step', async () => {
     server = await startServer((_count, res) => sendJson(res, 503, { error: 'down' }));
-    const { executionId, stepIds } = await seedExecution(prisma, [httpStep(server.url), pickId], undefined, {
-      maxAttempts: 3,
-      backoffBaseMs: 100,
-    });
+    const { executionId, stepIds } = await seedExecution(
+      prisma,
+      [httpStep(server.url), pickId],
+      undefined,
+      {
+        maxAttempts: 3,
+        backoffBaseMs: 100,
+      },
+    );
     await enqueueStep(queue, { executionId, stepExecutionId: stepIds[0] as string });
 
     const execution = await waitForFinish(prisma, executionId);
@@ -116,7 +129,10 @@ describe('retries', () => {
     expect(execution.error).toContain('after 3 attempts');
     expect(execution.error).toContain('HTTP 503');
 
-    const steps = await prisma.stepExecution.findMany({ where: { executionId }, orderBy: { position: 'asc' } });
+    const steps = await prisma.stepExecution.findMany({
+      where: { executionId },
+      orderBy: { position: 'asc' },
+    });
     expect(steps.map((step) => step.status)).toEqual(['FAILED', 'SKIPPED']);
     expect(steps[0]?.attempts).toBe(3);
     expect(server.seen).toHaveLength(3);
@@ -134,17 +150,24 @@ describe('retries', () => {
 
   it('does not retry a permanent failure', async () => {
     server = await startServer((_count, res) => sendJson(res, 404, { error: 'missing' }));
-    const { executionId, stepIds } = await seedExecution(prisma, [httpStep(server.url)], undefined, {
-      maxAttempts: 5,
-      backoffBaseMs: 100,
-    });
+    const { executionId, stepIds } = await seedExecution(
+      prisma,
+      [httpStep(server.url)],
+      undefined,
+      {
+        maxAttempts: 5,
+        backoffBaseMs: 100,
+      },
+    );
     await enqueueStep(queue, { executionId, stepExecutionId: stepIds[0] as string });
 
     const execution = await waitForFinish(prisma, executionId);
     expect(execution.status).toBe('FAILED');
     expect(server.seen).toHaveLength(1);
 
-    const step = await prisma.stepExecution.findUniqueOrThrow({ where: { id: stepIds[0] as string } });
+    const step = await prisma.stepExecution.findUniqueOrThrow({
+      where: { id: stepIds[0] as string },
+    });
     expect(step.attempts).toBe(1);
 
     const dead = await waitFor(
@@ -155,21 +178,30 @@ describe('retries', () => {
 
   it('exposes the RETRYING state with the time of the next attempt', async () => {
     server = await startServer((_count, res) => sendJson(res, 503, { error: 'down' }));
-    const { executionId, stepIds } = await seedExecution(prisma, [httpStep(server.url)], undefined, {
-      maxAttempts: 3,
-      backoffBaseMs: 5000,
-    });
+    const { executionId, stepIds } = await seedExecution(
+      prisma,
+      [httpStep(server.url)],
+      undefined,
+      {
+        maxAttempts: 3,
+        backoffBaseMs: 5000,
+      },
+    );
     await enqueueStep(queue, { executionId, stepExecutionId: stepIds[0] as string });
 
     const step = await waitFor(async () => {
-      const row = await prisma.stepExecution.findUniqueOrThrow({ where: { id: stepIds[0] as string } });
+      const row = await prisma.stepExecution.findUniqueOrThrow({
+        where: { id: stepIds[0] as string },
+      });
       return row.status === 'RETRYING' ? row : null;
     });
     expect(step.attempts).toBe(1);
     expect(step.error).toContain('HTTP 503');
     expect(step.nextRetryAt?.getTime() ?? 0).toBeGreaterThan(Date.now());
 
-    const execution = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } });
+    const execution = await prisma.workflowExecution.findUniqueOrThrow({
+      where: { id: executionId },
+    });
     expect(execution.status).toBe('RUNNING');
     expect(await queue.getJobCounts('delayed')).toEqual({ delayed: 1 });
   });
@@ -185,7 +217,10 @@ describe('crash recovery', () => {
       where: { id: stepId },
       data: { status: 'RUNNING', attempts: 1, workerId: 'dead-worker' },
     });
-    await prisma.workflowExecution.update({ where: { id: executionId }, data: { status: 'RUNNING' } });
+    await prisma.workflowExecution.update({
+      where: { id: executionId },
+      data: { status: 'RUNNING' },
+    });
 
     await processor({ data: { executionId, stepExecutionId: stepId } });
 
@@ -193,6 +228,8 @@ describe('crash recovery', () => {
     expect(step.status).toBe('SUCCESS');
     expect(step.attempts).toBe(2);
     expect(step.workerId).toBe('test-worker');
-    expect((await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } })).status).toBe('SUCCESS');
+    expect(
+      (await prisma.workflowExecution.findUniqueOrThrow({ where: { id: executionId } })).status,
+    ).toBe('SUCCESS');
   });
 });

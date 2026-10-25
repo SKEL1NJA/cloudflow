@@ -54,7 +54,9 @@ describe('LoginPage', () => {
   });
 
   it('shows the server message, clears the password and focuses it after a failed sign-in', async () => {
-    mockFetch(() => json(401, { error: { code: 'UNAUTHORIZED', message: 'Invalid email or password' } }));
+    mockFetch(() =>
+      json(401, { error: { code: 'UNAUTHORIZED', message: 'Invalid email or password' } }),
+    );
     renderLogin();
 
     await userEvent.type(screen.getByLabelText('Email'), 'uday@example.com');

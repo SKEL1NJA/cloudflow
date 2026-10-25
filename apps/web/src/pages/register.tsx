@@ -59,7 +59,10 @@ export function RegisterPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+          <Link
+            to="/login"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
             Sign in
           </Link>
         </>
@@ -103,7 +106,9 @@ export function RegisterPage() {
           </p>
         ) : null}
         <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
-          {formState.isSubmitting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
+          {formState.isSubmitting ? (
+            <LoaderCircle className="animate-spin" aria-hidden="true" />
+          ) : null}
           Create account
         </Button>
       </form>

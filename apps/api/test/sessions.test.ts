@@ -83,7 +83,9 @@ describe('issuing sessions', () => {
   it('starts a new family on every login', async () => {
     const first = await signUp();
     const second = await signIn();
-    expect((await rowFor(first.cookie.value)).familyId).not.toBe((await rowFor(second.cookie.value)).familyId);
+    expect((await rowFor(first.cookie.value)).familyId).not.toBe(
+      (await rowFor(second.cookie.value)).familyId,
+    );
   });
 });
 
@@ -105,7 +107,11 @@ describe('POST /auth/refresh', () => {
 
     const accessToken = res.json<AuthBody>().accessToken;
     expect(res.json<AuthBody>().user.id).toBe(body.user.id);
-    const me = await app.inject({ method: 'GET', url: '/auth/me', headers: authHeader(accessToken) });
+    const me = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: authHeader(accessToken),
+    });
     expect(me.statusCode).toBe(200);
   });
 
@@ -159,7 +165,13 @@ describe('POST /auth/refresh', () => {
     const next = await rowFor(refreshCookie(res)?.value ?? '');
     expect(next.expiresAt.getTime()).toBeLessThanOrEqual(soon.getTime());
 
-    await app.prisma.refreshToken.update({ where: { id: next.id }, data: { sessionExpiresAt: new Date(Date.now() - 1000), expiresAt: new Date(Date.now() - 1000) } });
+    await app.prisma.refreshToken.update({
+      where: { id: next.id },
+      data: {
+        sessionExpiresAt: new Date(Date.now() - 1000),
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    });
     expect((await refresh(refreshCookie(res)?.value ?? '')).statusCode).toBe(401);
   });
 

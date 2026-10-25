@@ -12,10 +12,7 @@ import type { Logger } from 'pino';
 import { markStepFailed } from './step-state.js';
 
 export type RecoveryReason =
-  | 'pending_not_queued'
-  | 'retry_lost'
-  | 'worker_lost'
-  | 'worker_lost_exhausted';
+  'pending_not_queued' | 'retry_lost' | 'worker_lost' | 'worker_lost_exhausted';
 
 export interface ReconcilerOptions {
   graceMs: number;
@@ -60,9 +57,7 @@ function reasonFor(candidate: Candidate): RecoveryReason {
     case 'RETRYING':
       return 'retry_lost';
     case 'RUNNING':
-      return candidate.attempts >= candidate.maxAttempts
-        ? 'worker_lost_exhausted'
-        : 'worker_lost';
+      return candidate.attempts >= candidate.maxAttempts ? 'worker_lost_exhausted' : 'worker_lost';
     default:
       return assertNever(candidate.status);
   }
@@ -151,9 +146,7 @@ export async function reconcileOnce(
     }
 
     const seenAt = new Date(candidate.updatedAt);
-    const touchedAt = new Date(
-      Math.max(now.getTime(), seenAt.getTime() + 1),
-    );
+    const touchedAt = new Date(Math.max(now.getTime(), seenAt.getTime() + 1));
 
     const won = await prisma.stepExecution.updateMany({
       where: {
@@ -236,10 +229,7 @@ export async function reconcileOnce(
           failedAt: new Date().toISOString(),
         });
       } catch (err) {
-        logger.warn(
-          { err, ...target },
-          'failed to publish to the dead-letter queue',
-        );
+        logger.warn({ err, ...target }, 'failed to publish to the dead-letter queue');
       }
 
       result.failed += 1;
@@ -281,9 +271,12 @@ export function startReconciler(
   function schedule(): void {
     if (stopped) return;
 
-    timer = setTimeout(() => {
-      inFlight = pass().finally(schedule);
-    }, intervalMs * (0.8 + Math.random() * 0.4));
+    timer = setTimeout(
+      () => {
+        inFlight = pass().finally(schedule);
+      },
+      intervalMs * (0.8 + Math.random() * 0.4),
+    );
   }
 
   schedule();

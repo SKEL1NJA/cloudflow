@@ -9,7 +9,9 @@ export function RequireAuth() {
 
   if (session.status === 'loading') return <FullPageSkeleton />;
   if (session.status === 'anonymous') {
-    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
+    return (
+      <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+    );
   }
   return <Outlet />;
 }

@@ -7,10 +7,16 @@ describe('safeRedirectPath', () => {
     expect(safeRedirectPath('/executions?status=FAILED')).toBe('/executions?status=FAILED');
   });
 
-  it.each(['https://evil.example', '//evil.example', '/\\evil.example', 'javascript:alert(1)', '', 42, null, undefined])(
-    'falls back for %s',
-    (value) => {
-      expect(safeRedirectPath(value)).toBe('/');
-    },
-  );
+  it.each([
+    'https://evil.example',
+    '//evil.example',
+    '/\\evil.example',
+    'javascript:alert(1)',
+    '',
+    42,
+    null,
+    undefined,
+  ])('falls back for %s', (value) => {
+    expect(safeRedirectPath(value)).toBe('/');
+  });
 });

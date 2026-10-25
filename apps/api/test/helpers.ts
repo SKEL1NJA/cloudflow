@@ -70,7 +70,12 @@ export function seedExecution(
   userId: string,
   options: SeedExecutionOptions = {},
 ) {
-  const { status = 'QUEUED', stepStatuses = [], createdAt = new Date(), stepFinishedAt = createdAt } = options;
+  const {
+    status = 'QUEUED',
+    stepStatuses = [],
+    createdAt = new Date(),
+    stepFinishedAt = createdAt,
+  } = options;
   return app.prisma.workflowExecution.create({
     data: {
       workflowId: workflow.id,

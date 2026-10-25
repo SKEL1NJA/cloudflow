@@ -7,9 +7,9 @@ updates:
     open-pull-requests-limit: 5
     ignore:
       - dependency-name: prisma
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@prisma/*"
-        update-types: ["version-update:semver-major"]
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@prisma/*'
+        update-types: ['version-update:semver-major']
     groups:
       minor-and-patch:
-        update-types: ["minor", "patch"]
+        update-types: ['minor', 'patch']

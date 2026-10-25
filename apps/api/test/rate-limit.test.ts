@@ -135,18 +135,29 @@ describe('API key and per-user limits', () => {
     expect(statuses[30]).toBe(429);
 
     const session = (await login('uday@example.com', PASSWORD)).json<{ accessToken: string }>();
-    const me = await app.inject({ method: 'GET', url: '/auth/me', headers: authHeader(session.accessToken) });
+    const me = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: authHeader(session.accessToken),
+    });
     expect(me.statusCode).toBe(200);
   });
 
   it('limits API key creation per user, not per address', async () => {
     await createUser('a@example.com');
     await createUser('b@example.com');
-    const tokenA = (await login('a@example.com', PASSWORD)).json<{ accessToken: string }>().accessToken;
-    const tokenB = (await login('b@example.com', PASSWORD)).json<{ accessToken: string }>().accessToken;
+    const tokenA = (await login('a@example.com', PASSWORD)).json<{ accessToken: string }>()
+      .accessToken;
+    const tokenB = (await login('b@example.com', PASSWORD)).json<{ accessToken: string }>()
+      .accessToken;
 
     const create = (token: string) =>
-      app.inject({ method: 'POST', url: '/api-keys', headers: authHeader(token), payload: { name: 'ci' } });
+      app.inject({
+        method: 'POST',
+        url: '/api-keys',
+        headers: authHeader(token),
+        payload: { name: 'ci' },
+      });
 
     for (let index = 0; index < 10; index += 1) {
       expect((await create(tokenA)).statusCode).toBe(201);

@@ -30,8 +30,12 @@ describe('backoffDelayMs', () => {
 
 describe('decideFailure', () => {
   it('retries a retryable failure while attempts remain', () => {
-    expect(decideFailure({ retryable: true, attempt: 1, maxAttempts: 3 })).toEqual({ action: 'retry' });
-    expect(decideFailure({ retryable: true, attempt: 2, maxAttempts: 3 })).toEqual({ action: 'retry' });
+    expect(decideFailure({ retryable: true, attempt: 1, maxAttempts: 3 })).toEqual({
+      action: 'retry',
+    });
+    expect(decideFailure({ retryable: true, attempt: 2, maxAttempts: 3 })).toEqual({
+      action: 'retry',
+    });
   });
 
   it('gives up when attempts are exhausted', () => {

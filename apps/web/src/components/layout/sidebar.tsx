@@ -36,7 +36,13 @@ const MAIN_NAV: NavEntry[] = [
 
 const SETTINGS_NAV: NavEntry = { to: '/settings', label: 'Settings', icon: Settings };
 
-function NavItem({ entry, onNavigate }: { entry: NavEntry; onNavigate?: (() => void) | undefined }) {
+function NavItem({
+  entry,
+  onNavigate,
+}: {
+  entry: NavEntry;
+  onNavigate?: (() => void) | undefined;
+}) {
   const { to, label, icon: Icon, end } = entry;
 
   return (
@@ -96,7 +102,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{displayName}</p>
-              {user.name ? <p className="truncate text-xs text-muted-foreground">{user.email}</p> : null}
+              {user.name ? (
+                <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+              ) : null}
             </div>
             <Button
               variant="ghost"

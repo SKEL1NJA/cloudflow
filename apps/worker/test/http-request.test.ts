@@ -39,7 +39,11 @@ describe('successful requests', () => {
   it('sends the idempotency key, a JSON body and custom headers', async () => {
     server = await startServer((_count, res) => sendJson(res, 200, {}));
     await runHttpRequest(
-      config(server.url, { method: 'POST', body: { hello: 'world' }, headers: { 'X-Custom': 'yes' } }),
+      config(server.url, {
+        method: 'POST',
+        body: { hello: 'world' },
+        headers: { 'X-Custom': 'yes' },
+      }),
       context(true),
     );
     const seen = server.seen[0];
@@ -54,7 +58,10 @@ describe('successful requests', () => {
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('hello');
     });
-    expect(await runHttpRequest(config(server.url), context(true))).toEqual({ status: 200, body: 'hello' });
+    expect(await runHttpRequest(config(server.url), context(true))).toEqual({
+      status: 200,
+      body: 'hello',
+    });
   });
 });
 
@@ -87,7 +94,9 @@ describe('failure classification', () => {
     server = await startServer(() => {
       // never respond
     });
-    const error = await failureOf(runHttpRequest(config(server.url, { timeoutMs: 200 }), context(true)));
+    const error = await failureOf(
+      runHttpRequest(config(server.url, { timeoutMs: 200 }), context(true)),
+    );
     expect(error.retryable).toBe(true);
     expect(error.message).toContain('timed out');
   });
