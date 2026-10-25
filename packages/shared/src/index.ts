@@ -7,3 +7,4 @@ export * from './steps.js';
 export * from './util.js';
 export * from './workflows.js';
 export * from './realtime.js';
+export * from './auth.js';
