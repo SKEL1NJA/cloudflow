@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router/dom';
+import { Toaster } from '@/components/ui/sonner';
 import { bootstrapSession } from '@/auth/bootstrap';
 import { queryClient } from '@/lib/query-client';
 import { router } from './router';
@@ -25,6 +26,7 @@ createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <Toaster />
       {Devtools ? (
         <Suspense fallback={null}>
           <Devtools buttonPosition="bottom-right" />

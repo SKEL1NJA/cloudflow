@@ -49,17 +49,22 @@ function subscribe(listener: () => void): () => void {
 
 export function setThemePreference(next: ThemePreference): void {
   preference = next;
+
   try {
     if (next === 'system') window.localStorage.removeItem(STORAGE_KEY);
     else window.localStorage.setItem(STORAGE_KEY, next);
   } catch {
-    // storage can be unavailable in private modes, the choice just will not persist
   }
+
   emit();
 }
 
 export function useThemePreference(): ThemePreference {
   return useSyncExternalStore(subscribe, () => preference);
+}
+
+export function useResolvedTheme(): ResolvedTheme {
+  return useSyncExternalStore(subscribe, () => resolve(preference));
 }
 
 if (typeof window.matchMedia === 'function') {

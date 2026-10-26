@@ -11,3 +11,12 @@ export function useRecentExecutions() {
     refetchInterval: 30_000,
   });
 }
+
+export function useWorkflowExecutions(workflowId: string) {
+  const params: ExecutionListParams = { workflowId, page: 1, pageSize: 10 };
+
+  return useQuery({
+    queryKey: queryKeys.executions.list(params),
+    queryFn: ({ signal }) => fetchExecutions(params, signal),
+  });
+}

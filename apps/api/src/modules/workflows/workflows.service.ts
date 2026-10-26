@@ -1,7 +1,8 @@
-import type { Prisma, PrismaClient } from '@cloudflow/db';
+import { Prisma, type PrismaClient } from '@cloudflow/db';
 import {
   assertNever,
   workflowStepSchema,
+  type ExecutionStatus,
   type Paginated,
   type WorkflowDefinition,
   type WorkflowDetail,
@@ -14,6 +15,7 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 
 const detailInclude = { steps: { orderBy: { position: 'asc' } } } satisfies Prisma.WorkflowInclude;
 type WorkflowWithSteps = Prisma.WorkflowGetPayload<{ include: typeof detailInclude }>;
+type Queryable = Pick<PrismaClient, '$queryRaw'>;
 
 interface WorkflowRowFields {
   id: string;
@@ -26,7 +28,56 @@ interface WorkflowRowFields {
   updatedAt: Date;
 }
 
-function baseFields(row: WorkflowRowFields) {
+interface WorkflowStats {
+  lastRun: { status: ExecutionStatus; at: string } | null;
+  successRate: number | null;
+  finishedRuns: number;
+}
+
+const NO_STATS: WorkflowStats = { lastRun: null, successRate: null, finishedRuns: 0 };
+const STATS_WINDOW_MS = 30 * 86_400_000;
+
+async function loadStats(db: Queryable, ids: string[]): Promise<Map<string, WorkflowStats>> {
+  const stats = new Map<string, WorkflowStats>();
+  if (ids.length === 0) return stats;
+
+  const since = new Date(Date.now() - STATS_WINDOW_MS);
+  const idList = Prisma.sql`ARRAY[${Prisma.join(ids)}]::uuid[]`;
+
+  const [latest, counts] = await Promise.all([
+    db.$queryRaw<{ workflowId: string; status: string; createdAt: Date }[]>`
+      SELECT w.id AS "workflowId", e.status::text AS status, e.created_at AS "createdAt"
+      FROM unnest(${idList}) AS w(id)
+      JOIN LATERAL (
+        SELECT status, created_at
+        FROM workflow_executions
+        WHERE workflow_id = w.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) e ON true`,
+    db.$queryRaw<{ workflowId: string; success: bigint; finished: bigint }[]>`
+      SELECT workflow_id AS "workflowId",
+             count(*) FILTER (WHERE status = 'SUCCESS') AS success,
+             count(*) FILTER (WHERE status IN ('SUCCESS', 'FAILED')) AS finished
+      FROM workflow_executions
+      WHERE workflow_id = ANY(${idList}) AND created_at >= ${since}::timestamptz
+      GROUP BY workflow_id`,
+  ]);
+
+  const counted = new Map(counts.map((row) => [row.workflowId, row]));
+  for (const row of latest) {
+    const count = counted.get(row.workflowId);
+    const finished = Number(count?.finished ?? 0);
+    stats.set(row.workflowId, {
+      lastRun: { status: row.status as ExecutionStatus, at: row.createdAt.toISOString() },
+      successRate: finished > 0 ? Number(count?.success ?? 0) / finished : null,
+      finishedRuns: finished,
+    });
+  }
+  return stats;
+}
+
+function baseFields(row: WorkflowRowFields, stats: WorkflowStats) {
   return {
     id: row.id,
     name: row.name,
@@ -34,14 +85,17 @@ function baseFields(row: WorkflowRowFields) {
     enabled: row.enabled,
     maxAttempts: row.maxAttempts,
     backoffBaseMs: row.backoffBaseMs,
+    lastRun: stats.lastRun,
+    successRate: stats.successRate,
+    finishedRuns: stats.finishedRuns,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-function toDetail(row: WorkflowWithSteps): WorkflowDetail {
+function toDetail(row: WorkflowWithSteps, stats: WorkflowStats): WorkflowDetail {
   return {
-    ...baseFields(row),
+    ...baseFields(row, stats),
     stepCount: row.steps.length,
     steps: row.steps.map((step) => ({
       id: step.id,
@@ -49,6 +103,11 @@ function toDetail(row: WorkflowWithSteps): WorkflowDetail {
       ...workflowStepSchema.parse({ type: step.type, name: step.name, config: step.config }),
     })),
   };
+}
+
+async function detailWithStats(db: Queryable, row: WorkflowWithSteps): Promise<WorkflowDetail> {
+  const stats = (await loadStats(db, [row.id])).get(row.id) ?? NO_STATS;
+  return toDetail(row, stats);
 }
 
 function toStepData(steps: WorkflowDefinition['steps']) {
@@ -114,7 +173,7 @@ export async function createWorkflow(
       },
       include: detailInclude,
     });
-    return toDetail(row);
+    return await detailWithStats(prisma, row);
   } catch (err) {
     throw translateWriteError(err);
   }
@@ -142,8 +201,16 @@ export async function listWorkflows(
     }),
   ]);
 
+  const stats = await loadStats(
+    prisma,
+    rows.map((row) => row.id),
+  );
+
   return {
-    data: rows.map((row) => ({ ...baseFields(row), stepCount: row._count.steps })),
+    data: rows.map((row) => ({
+      ...baseFields(row, stats.get(row.id) ?? NO_STATS),
+      stepCount: row._count.steps,
+    })),
     pagination: {
       page: query.page,
       pageSize: query.pageSize,
@@ -165,7 +232,7 @@ export async function getWorkflow(
   if (!row) {
     throw new NotFoundError('Workflow not found');
   }
-  return toDetail(row);
+  return detailWithStats(prisma, row);
 }
 
 export async function replaceWorkflow(
@@ -193,7 +260,7 @@ export async function replaceWorkflow(
       });
       return tx.workflow.findUniqueOrThrow({ where: { id }, include: detailInclude });
     });
-    return toDetail(row);
+    return await detailWithStats(prisma, row);
   } catch (err) {
     throw translateWriteError(err);
   }
@@ -220,7 +287,7 @@ export async function patchWorkflow(
         include: detailInclude,
       });
     });
-    return toDetail(row);
+    return await detailWithStats(prisma, row);
   } catch (err) {
     throw translateWriteError(err);
   }

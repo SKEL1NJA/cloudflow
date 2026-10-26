@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ExecutionStatus } from './executions.js';
 import { workflowStepSchema, type WorkflowStepInput } from './steps.js';
 
 const nameSchema = z.string().trim().min(1).max(100);
@@ -56,6 +57,11 @@ export interface Paginated<T> {
   pagination: PaginationMeta;
 }
 
+export interface WorkflowRunSummary {
+  status: ExecutionStatus;
+  at: string;
+}
+
 export interface WorkflowSummary {
   id: string;
   name: string;
@@ -64,6 +70,9 @@ export interface WorkflowSummary {
   maxAttempts: number;
   backoffBaseMs: number;
   stepCount: number;
+  lastRun: WorkflowRunSummary | null;
+  successRate: number | null;
+  finishedRuns: number;
   createdAt: string;
   updatedAt: string;
 }

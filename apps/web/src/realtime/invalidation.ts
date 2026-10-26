@@ -36,6 +36,8 @@ export function createInvalidator(queryClient: QueryClient, delayMs = 300): Inva
         schedule(['overview']);
         schedule(['stats']);
         schedule(queryKeys.executions.lists);
+        schedule(queryKeys.workflows.lists);
+        schedule(queryKeys.workflows.detail(event.workflowId));
       }
       schedule(queryKeys.executions.detail(event.executionId));
     },
