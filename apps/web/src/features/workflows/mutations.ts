@@ -1,9 +1,20 @@
-import type { Paginated, WorkflowDetail, WorkflowSummary } from '@cloudflow/shared';
+import type {
+  Paginated,
+  WorkflowDefinition,
+  WorkflowDetail,
+  WorkflowSummary,
+} from '@cloudflow/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { describeError } from '@/api/errors';
-import { deleteWorkflow, patchWorkflow, runWorkflow } from '@/api/workflows';
+import {
+  createWorkflow,
+  deleteWorkflow,
+  patchWorkflow,
+  replaceWorkflow,
+  runWorkflow,
+} from '@/api/workflows';
 import { queryKeys } from '@/queries/keys';
 
 interface ToggleVariables {
@@ -18,7 +29,9 @@ export function useToggleWorkflow() {
     mutationFn: ({ id, enabled }: ToggleVariables) => patchWorkflow(id, { enabled }),
 
     onMutate: async ({ id, enabled }) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.workflows.all });
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.workflows.all,
+      });
 
       const lists = queryClient.getQueriesData<Paginated<WorkflowSummary>>({
         queryKey: queryKeys.workflows.lists,
@@ -30,9 +43,12 @@ export function useToggleWorkflow() {
         (page) =>
           page && {
             ...page,
-            data: page.data.map((workflow) => (workflow.id === id ? { ...workflow, enabled } : workflow)),
+            data: page.data.map((workflow) =>
+              workflow.id === id ? { ...workflow, enabled } : workflow,
+            ),
           },
       );
+
       queryClient.setQueryData<WorkflowDetail>(
         queryKeys.workflows.detail(id),
         (current) => current && { ...current, enabled },
@@ -42,9 +58,17 @@ export function useToggleWorkflow() {
     },
 
     onError: (error, { id }, context) => {
-      for (const [key, data] of context?.lists ?? []) queryClient.setQueryData(key, data);
-      if (context?.detail) queryClient.setQueryData(queryKeys.workflows.detail(id), context.detail);
-      toast.error('Could not update the workflow', { description: describeError(error) });
+      for (const [key, data] of context?.lists ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+
+      if (context?.detail) {
+        queryClient.setQueryData(queryKeys.workflows.detail(id), context.detail);
+      }
+
+      toast.error('Could not update the workflow', {
+        description: describeError(error),
+      });
     },
 
     onSuccess: (_workflow, { enabled }) => {
@@ -52,8 +76,12 @@ export function useToggleWorkflow() {
     },
 
     onSettled: (_workflow, _error, { id }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.lists });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.detail(id) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workflows.lists,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workflows.detail(id),
+      });
     },
   });
 }
@@ -66,14 +94,22 @@ export function useDeleteWorkflow() {
 
     onSuccess: (_result, id) => {
       toast.success('Workflow deleted');
-      queryClient.removeQueries({ queryKey: queryKeys.workflows.detail(id) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.lists });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.executions.lists });
+      queryClient.removeQueries({
+        queryKey: queryKeys.workflows.detail(id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workflows.lists,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.executions.lists,
+      });
       void queryClient.invalidateQueries({ queryKey: ['overview'] });
     },
 
     onError: (error) => {
-      toast.error('Could not delete the workflow', { description: describeError(error) });
+      toast.error('Could not delete the workflow', {
+        description: describeError(error),
+      });
     },
   });
 }
@@ -97,15 +133,46 @@ export function useRunWorkflow() {
     onSuccess: (execution) => {
       toast.success('Execution started', {
         description: `${execution.workflowName} is queued.`,
-        action: { label: 'View', onClick: () => void navigate(`/executions/${execution.id}`) },
+        action: {
+          label: 'View',
+          onClick: () => void navigate(`/executions/${execution.id}`),
+        },
       });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.executions.lists });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows.lists });
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.executions.lists,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workflows.lists,
+      });
       void queryClient.invalidateQueries({ queryKey: ['overview'] });
     },
 
     onError: (error) => {
-      toast.error('Could not start the workflow', { description: describeError(error) });
+      toast.error('Could not start the workflow', {
+        description: describeError(error),
+      });
+    },
+  });
+}
+
+type SaveTarget = { mode: 'create' } | { mode: 'edit'; id: string };
+
+export function useSaveWorkflow(target: SaveTarget) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (definition: WorkflowDefinition) =>
+      target.mode === 'create'
+        ? createWorkflow(definition)
+        : replaceWorkflow(target.id, definition),
+
+    onSuccess: (workflow) => {
+      queryClient.setQueryData(queryKeys.workflows.detail(workflow.id), workflow);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workflows.lists,
+      });
+      void queryClient.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 }

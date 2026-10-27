@@ -53,8 +53,7 @@ export function setThemePreference(next: ThemePreference): void {
   try {
     if (next === 'system') window.localStorage.removeItem(STORAGE_KEY);
     else window.localStorage.setItem(STORAGE_KEY, next);
-  } catch {
-  }
+  } catch {}
 
   emit();
 }

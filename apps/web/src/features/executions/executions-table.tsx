@@ -2,12 +2,7 @@ import type { ExecutionSummary } from '@cloudflow/shared';
 import { Link, useNavigate } from 'react-router';
 import { StatusBadge } from '@/components/status-badge';
 import { useNow } from '@/hooks/use-now';
-import {
-  formatDateTime,
-  formatDuration,
-  formatRelativeTime,
-  shortExecutionId,
-} from '@/lib/format';
+import { formatDateTime, formatDuration, formatRelativeTime, shortExecutionId } from '@/lib/format';
 
 interface ExecutionsTableProps {
   rows: ExecutionSummary[];

@@ -14,5 +14,7 @@ interface RangeSwitchProps {
 }
 
 export function RangeSwitch({ value, onChange }: RangeSwitchProps) {
-  return <SegmentedControl label="Time range" value={value} onChange={onChange} options={OPTIONS} />;
+  return (
+    <SegmentedControl label="Time range" value={value} onChange={onChange} options={OPTIONS} />
+  );
 }

@@ -3,6 +3,7 @@ import { RequireAnonymous, RequireAuth } from '@/auth/guards';
 import { AppShell } from '@/components/layout/app-shell';
 import { OverviewPage } from '@/features/overview/overview-page';
 import { WorkflowDetailsPage } from '@/features/workflows/workflow-details-page';
+import { CreateWorkflowPage, EditWorkflowPage } from '@/features/workflows/workflow-form-page';
 import { WorkflowsPage } from '@/features/workflows/workflows-page';
 import { LoginPage } from '@/pages/login';
 import { NotFoundPage } from '@/pages/not-found';
@@ -48,12 +49,12 @@ export const router = createBrowserRouter([
               {
                 path: 'workflows/new',
                 handle: { title: 'Create workflow' },
-                element: (
-                  <PlaceholderPage
-                    title="Create workflow"
-                    description="The visual workflow builder arrives in the next step."
-                  />
-                ),
+                element: <CreateWorkflowPage />,
+              },
+              {
+                path: 'workflows/:id/edit',
+                handle: { title: 'Edit workflow' },
+                element: <EditWorkflowPage />,
               },
               {
                 path: 'workflows/:id',
@@ -64,10 +65,7 @@ export const router = createBrowserRouter([
                 path: 'executions',
                 handle: { title: 'Executions' },
                 element: (
-                  <PlaceholderPage
-                    title="Executions"
-                    description="Every run, step by step."
-                  />
+                  <PlaceholderPage title="Executions" description="Every run, step by step." />
                 ),
               },
               {
@@ -94,20 +92,14 @@ export const router = createBrowserRouter([
                 path: 'queue',
                 handle: { title: 'Queue' },
                 element: (
-                  <PlaceholderPage
-                    title="Queue"
-                    description="Work waiting to be processed."
-                  />
+                  <PlaceholderPage title="Queue" description="Work waiting to be processed." />
                 ),
               },
               {
                 path: 'logs',
                 handle: { title: 'Logs' },
                 element: (
-                  <PlaceholderPage
-                    title="Logs"
-                    description="Search what your workflows did."
-                  />
+                  <PlaceholderPage title="Logs" description="Search what your workflows did." />
                 ),
               },
               {

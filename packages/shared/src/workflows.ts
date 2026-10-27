@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import type { ExecutionStatus } from './executions.js';
+import { wholeNumber } from './numbers.js';
 import { workflowStepSchema, type WorkflowStepInput } from './steps.js';
 
-const nameSchema = z.string().trim().min(1).max(100);
-const descriptionSchema = z.string().trim().max(500);
-const maxAttemptsSchema = z.number().int().min(1).max(10);
-const backoffBaseMsSchema = z.number().int().min(100).max(60_000);
+const nameSchema = z.string().trim().min(1, 'Enter a name').max(100, 'Use at most 100 characters');
+const descriptionSchema = z.string().trim().max(500, 'Use at most 500 characters');
+const maxAttemptsSchema = wholeNumber(1, 10);
+const backoffBaseMsSchema = wholeNumber(100, 60_000);
 
 export const workflowDefinitionSchema = z.object({
   name: nameSchema,
@@ -13,7 +14,10 @@ export const workflowDefinitionSchema = z.object({
   enabled: z.boolean().default(true),
   maxAttempts: maxAttemptsSchema.default(3),
   backoffBaseMs: backoffBaseMsSchema.default(2000),
-  steps: z.array(workflowStepSchema).min(1).max(20),
+  steps: z
+    .array(workflowStepSchema)
+    .min(1, 'Add at least one step')
+    .max(20, 'A workflow can have at most 20 steps'),
 });
 
 export const workflowPatchSchema = z

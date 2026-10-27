@@ -123,7 +123,9 @@ export function WorkflowsPage() {
   } else {
     content = (
       <>
-        <Card className={cn('overflow-hidden', isPlaceholderData && 'opacity-60 transition-opacity')}>
+        <Card
+          className={cn('overflow-hidden', isPlaceholderData && 'opacity-60 transition-opacity')}
+        >
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <caption className="sr-only">Workflows</caption>
@@ -142,10 +144,19 @@ export function WorkflowsPage() {
                   <th scope="col" className="px-4 py-2 font-medium whitespace-nowrap">
                     Last run
                   </th>
-                  <th scope="col" className="px-4 py-2 font-medium whitespace-nowrap" title="Over the last 30 days">
+                  <th
+                    scope="col"
+                    className="px-4 py-2 font-medium whitespace-nowrap"
+                    title="Over the last 30 days"
+                  >
                     Success rate
                   </th>
-                  <SortHeader column="updatedAt" label="Updated" params={params} onSort={handleSort} />
+                  <SortHeader
+                    column="updatedAt"
+                    label="Updated"
+                    params={params}
+                    onSort={handleSort}
+                  />
                   <th scope="col" className="px-2 py-2">
                     <span className="sr-only">Actions</span>
                   </th>

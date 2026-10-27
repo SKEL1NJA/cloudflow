@@ -21,7 +21,10 @@ export function parseListParams(search: URLSearchParams): ListParams {
   return urlSchema.parse(Object.fromEntries(search));
 }
 
-export function applyListPatch(current: URLSearchParams, patch: Partial<ListParams>): URLSearchParams {
+export function applyListPatch(
+  current: URLSearchParams,
+  patch: Partial<ListParams>,
+): URLSearchParams {
   const next = { ...parseListParams(current), ...patch };
   if (!('page' in patch)) next.page = 1;
 
@@ -51,7 +54,9 @@ export function useWorkflowListParams() {
 
   const update = useCallback(
     (patch: Partial<ListParams>, options?: { replace?: boolean }) => {
-      setSearch((current) => applyListPatch(current, patch), { replace: options?.replace ?? false });
+      setSearch((current) => applyListPatch(current, patch), {
+        replace: options?.replace ?? false,
+      });
     },
     [setSearch],
   );

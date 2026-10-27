@@ -47,7 +47,13 @@ function detail(overrides: Record<string, unknown> = {}) {
         name: 'Pick fields',
         config: { mappings: [{ target: 'id', source: 'body.id' }] },
       },
-      { id: 's4', position: 3, type: 'NOTIFICATION', name: 'Tell someone', config: { message: 'Done' } },
+      {
+        id: 's4',
+        position: 3,
+        type: 'NOTIFICATION',
+        name: 'Tell someone',
+        config: { message: 'Done' },
+      },
     ],
     ...overrides,
   };
@@ -72,7 +78,10 @@ function api(workflowResponse: () => Response = () => json(200, detail())) {
     if (url.pathname === `/workflows/${WORKFLOW_ID}` && method === 'GET') return workflowResponse();
     if (url.pathname === `/workflows/${WORKFLOW_ID}` && method === 'DELETE') return json(204);
     if (url.pathname === '/executions') {
-      return json(200, { data: [executionRow], pagination: { page: 1, pageSize: 10, total: 1, totalPages: 1 } });
+      return json(200, {
+        data: [executionRow],
+        pagination: { page: 1, pageSize: 10, total: 1, totalPages: 1 },
+      });
     }
     return json(404, { error: { code: 'NOT_FOUND', message: 'Not found' } });
   });
@@ -118,9 +127,13 @@ describe('WorkflowDetailsPage', () => {
     expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByText('3 attempts, 2.0s backoff')).toBeInTheDocument();
 
-    const steps = within(screen.getByRole('list', { name: 'Workflow steps' })).getAllByRole('listitem');
+    const steps = within(screen.getByRole('list', { name: 'Workflow steps' })).getAllByRole(
+      'listitem',
+    );
     expect(steps).toHaveLength(4);
-    expect(within(steps[0] as HTMLElement).getByText(/GET https:\/\/example\.com\/api\/data$/)).toBeInTheDocument();
+    expect(
+      within(steps[0] as HTMLElement).getByText(/GET https:\/\/example\.com\/api\/data$/),
+    ).toBeInTheDocument();
     expect(within(steps[1] as HTMLElement).getByText(/Wait 1\.5s/)).toBeInTheDocument();
     expect(within(steps[2] as HTMLElement).getByText(/1 field mapping/)).toBeInTheDocument();
     expect(screen.queryByText(/token=abc/)).not.toBeInTheDocument();
@@ -163,7 +176,11 @@ describe('WorkflowDetailsPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'More actions' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete workflow' }));
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: 'Delete workflow',
+      }),
+    );
 
     expect(await screen.findByText('Workflows list page')).toBeInTheDocument();
   });
@@ -173,6 +190,8 @@ describe('WorkflowDetailsPage', () => {
     renderPage();
 
     expect(await screen.findByText("This workflow doesn't exist")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Back to workflows' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Back to workflows' })).toBeInTheDocument(),
+    );
   });
 });

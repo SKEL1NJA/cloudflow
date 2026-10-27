@@ -8,7 +8,12 @@ interface DeleteWorkflowDialogProps {
   onDeleted?: () => void;
 }
 
-export function DeleteWorkflowDialog({ workflow, open, onOpenChange, onDeleted }: DeleteWorkflowDialogProps) {
+export function DeleteWorkflowDialog({
+  workflow,
+  open,
+  onOpenChange,
+  onDeleted,
+}: DeleteWorkflowDialogProps) {
   const remove = useDeleteWorkflow();
 
   return (

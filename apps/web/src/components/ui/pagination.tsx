@@ -16,7 +16,12 @@ export function Pagination({ page, totalPages, total, noun, onPageChange }: Pagi
         {formatCount(total)} {total === 1 ? noun : `${noun}s`} · Page {page} of {totalPages}
       </p>
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
           Previous
         </Button>
         <Button

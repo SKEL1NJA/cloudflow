@@ -29,7 +29,11 @@ interface DropdownMenuItemProps extends React.ComponentProps<typeof DropdownMenu
   variant?: 'default' | 'destructive';
 }
 
-export function DropdownMenuItem({ className, variant = 'default', ...props }: DropdownMenuItemProps) {
+export function DropdownMenuItem({
+  className,
+  variant = 'default',
+  ...props
+}: DropdownMenuItemProps) {
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
@@ -46,5 +50,10 @@ export function DropdownMenuSeparator({
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
-  return <DropdownMenuPrimitive.Separator className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />;
+  return (
+    <DropdownMenuPrimitive.Separator
+      className={cn('-mx-1 my-1 h-px bg-border', className)}
+      {...props}
+    />
+  );
 }

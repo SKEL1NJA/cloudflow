@@ -39,9 +39,11 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
             {workflow.name}
           </Link>
         </td>
+
         <td className="hidden max-w-72 truncate px-4 py-2.5 text-muted-foreground lg:table-cell">
           {workflow.description ?? '-'}
         </td>
+
         <td className="px-4 py-2.5">
           <div className="flex items-center gap-2">
             <Switch
@@ -50,10 +52,14 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
               aria-label={`${workflow.name} enabled`}
               onCheckedChange={(enabled) => toggle.mutate({ id: workflow.id, enabled })}
             />
-            <span className="text-xs text-muted-foreground">{workflow.enabled ? 'Enabled' : 'Disabled'}</span>
+            <span className="text-xs text-muted-foreground">
+              {workflow.enabled ? 'Enabled' : 'Disabled'}
+            </span>
           </div>
         </td>
+
         <td className="px-4 py-2.5 tabular-nums text-muted-foreground">{workflow.stepCount}</td>
+
         <td className="px-4 py-2.5">
           {workflow.lastRun ? (
             <div className="flex items-center gap-2">
@@ -69,18 +75,21 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
             <span className="text-muted-foreground">Never run</span>
           )}
         </td>
+
         <td
           className="px-4 py-2.5 tabular-nums text-muted-foreground"
           title={`${workflow.finishedRuns} finished runs in the last 30 days`}
         >
           {workflow.successRate === null ? '-' : `${Math.round(workflow.successRate * 100)}%`}
         </td>
+
         <td
           className="px-4 py-2.5 whitespace-nowrap text-muted-foreground"
           title={formatDateTime(workflow.updatedAt)}
         >
           {formatRelativeTime(workflow.updatedAt, now)}
         </td>
+
         <td className="px-2 py-2.5">
           <div className="flex justify-end gap-1">
             <Button
@@ -92,17 +101,36 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
               disabled={!workflow.enabled || run.isPending}
               onClick={() => run.mutate(newRunVariables(workflow.id))}
             >
-              {run.isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
+              {run.isPending ? (
+                <LoaderCircle className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Play aria-hidden="true" />
+              )}
             </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${workflow.name}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  aria-label={`Actions for ${workflow.name}`}
+                >
                   <Ellipsis aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
+
               <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => void navigate(detailPath)}>View details</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void navigate(detailPath)}>
+                  View details
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onSelect={() => void navigate(`${detailPath}/edit`)}>
+                  Edit
+                </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
                   Delete
                 </DropdownMenuItem>
@@ -111,7 +139,12 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
           </div>
         </td>
       </tr>
-      <DeleteWorkflowDialog workflow={workflow} open={confirmingDelete} onOpenChange={setConfirmingDelete} />
+
+      <DeleteWorkflowDialog
+        workflow={workflow}
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+      />
     </>
   );
 }

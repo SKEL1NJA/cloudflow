@@ -1,4 +1,9 @@
-import { assertNever, type StepType, type WorkflowDetail, type WorkflowStepView } from '@cloudflow/shared';
+import {
+  assertNever,
+  type StepType,
+  type WorkflowDetail,
+  type WorkflowStepView,
+} from '@cloudflow/shared';
 import { formatDuration } from '@/lib/format';
 
 export const STEP_TYPE_LABELS: Record<StepType, string> = {
@@ -54,7 +59,9 @@ export function maskedDefinition(workflow: WorkflowDetail) {
         step.type === 'HTTP_REQUEST'
           ? {
               ...step.config,
-              headers: Object.fromEntries(Object.keys(step.config.headers).map((name) => [name, MASK])),
+              headers: Object.fromEntries(
+                Object.keys(step.config.headers).map((name) => [name, MASK]),
+              ),
             }
           : step.config,
     })),

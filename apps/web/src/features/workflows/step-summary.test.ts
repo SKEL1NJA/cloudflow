@@ -21,7 +21,9 @@ describe('summarizeStep', () => {
   });
 
   it('describes delays, transforms and notifications', () => {
-    expect(summarizeStep(step({ type: 'DELAY', name: 'Wait', config: { durationMs: 1500 } }))).toBe('Wait 1.5s');
+    expect(summarizeStep(step({ type: 'DELAY', name: 'Wait', config: { durationMs: 1500 } }))).toBe(
+      'Wait 1.5s',
+    );
     expect(
       summarizeStep(
         step({
@@ -32,7 +34,9 @@ describe('summarizeStep', () => {
       ),
     ).toBe('1 field mapping');
     expect(
-      summarizeStep(step({ type: 'NOTIFICATION', name: 'Tell', config: { message: 'x'.repeat(100) } })),
+      summarizeStep(
+        step({ type: 'NOTIFICATION', name: 'Tell', config: { message: 'x'.repeat(100) } }),
+      ),
     ).toHaveLength(80);
   });
 });

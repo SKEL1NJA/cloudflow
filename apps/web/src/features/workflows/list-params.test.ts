@@ -48,13 +48,20 @@ describe('applyListPatch', () => {
   });
 
   it('keeps the page when only the page is patched', () => {
-    expect(applyListPatch(new URLSearchParams('q=video'), { page: 3 }).toString()).toBe('page=3&q=video');
+    expect(applyListPatch(new URLSearchParams('q=video'), { page: 3 }).toString()).toBe(
+      'page=3&q=video',
+    );
   });
 });
 
 describe('toApiParams', () => {
   it('sends only the filters that are set', () => {
-    expect(toApiParams(params(''))).toEqual({ page: 1, pageSize: 20, sortBy: 'updatedAt', sortOrder: 'desc' });
+    expect(toApiParams(params(''))).toEqual({
+      page: 1,
+      pageSize: 20,
+      sortBy: 'updatedAt',
+      sortOrder: 'desc',
+    });
     expect(toApiParams(params('q=video&status=disabled&page=2&sort=name&order=asc'))).toEqual({
       page: 2,
       pageSize: 20,

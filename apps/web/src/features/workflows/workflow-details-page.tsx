@@ -1,5 +1,5 @@
 import type { WorkflowDetail } from '@cloudflow/shared';
-import { Ellipsis, Inbox, LoaderCircle, Play, SearchX } from 'lucide-react';
+import { Ellipsis, Inbox, LoaderCircle, Play } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { z } from 'zod';
@@ -28,6 +28,7 @@ import { DeleteWorkflowDialog } from './delete-workflow-dialog';
 import { newRunVariables, useRunWorkflow, useToggleWorkflow } from './mutations';
 import { StepFlow } from './step-flow';
 import { maskedDefinition } from './step-summary';
+import { WorkflowNotFound } from './workflow-not-found';
 
 const tabSchema = z.enum(['overview', 'executions', 'configuration']).catch('overview');
 
@@ -49,17 +50,24 @@ function OverviewTab({ workflow }: { workflow: WorkflowDetail }) {
         <Stat label="Steps">
           <span className="text-2xl font-semibold tabular-nums">{workflow.stepCount}</span>
         </Stat>
+
         <Stat label="Success rate">
           <span className="text-2xl font-semibold tabular-nums">
             {workflow.successRate === null ? '-' : `${Math.round(workflow.successRate * 100)}%`}
           </span>
-          <span className="ml-2 text-xs text-muted-foreground">{workflow.finishedRuns} runs in 30 days</span>
+          <span className="ml-2 text-xs text-muted-foreground">
+            {workflow.finishedRuns} runs in 30 days
+          </span>
         </Stat>
+
         <Stat label="Last run">
           {workflow.lastRun ? (
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={workflow.lastRun.status} />
-              <span className="text-xs text-muted-foreground" title={formatDateTime(workflow.lastRun.at)}>
+              <span
+                className="text-xs text-muted-foreground"
+                title={formatDateTime(workflow.lastRun.at)}
+              >
                 {formatRelativeTime(workflow.lastRun.at, now)}
               </span>
             </div>
@@ -67,11 +75,13 @@ function OverviewTab({ workflow }: { workflow: WorkflowDetail }) {
             <span className="text-muted-foreground">Never run</span>
           )}
         </Stat>
+
         <Stat label="Retries">
           {workflow.maxAttempts} {workflow.maxAttempts === 1 ? 'attempt' : 'attempts'},{' '}
           {formatDuration(workflow.backoffBaseMs)} backoff
         </Stat>
       </dl>
+
       <section>
         <h2 className="mb-4 text-sm font-medium">Flow</h2>
         <Card>
@@ -88,9 +98,13 @@ function ExecutionsTab({ workflowId }: { workflowId: string }) {
   const { data, error, isError, refetch } = useWorkflowExecutions(workflowId);
 
   if (isError && !data) {
-    return <ErrorState what="this workflow's executions" error={error} onRetry={() => void refetch()} />;
+    return (
+      <ErrorState what="this workflow's executions" error={error} onRetry={() => void refetch()} />
+    );
   }
+
   if (!data) return <Skeleton className="h-48 w-full" />;
+
   if (data.data.length === 0) {
     return (
       <EmptyState
@@ -100,9 +114,14 @@ function ExecutionsTab({ workflowId }: { workflowId: string }) {
       />
     );
   }
+
   return (
     <Card>
-      <ExecutionsTable rows={data.data} caption="Executions of this workflow" showWorkflow={false} />
+      <ExecutionsTable
+        rows={data.data}
+        caption="Executions of this workflow"
+        showWorkflow={false}
+      />
     </Card>
   );
 }
@@ -159,24 +178,12 @@ export function WorkflowDetailsPage() {
 
   if (isError && !workflow) {
     if (error instanceof ApiError && (error.status === 404 || error.status === 400)) {
-      return (
-        <>
-          <PageHeader title="Workflow not found" />
-          <EmptyState
-            icon={SearchX}
-            title="This workflow doesn't exist"
-            description="It may have been deleted, or the link is wrong."
-            action={
-              <Link to="/workflows" className={buttonVariants({ variant: 'outline' })}>
-                Back to workflows
-              </Link>
-            }
-          />
-        </>
-      );
+      return <WorkflowNotFound />;
     }
+
     return <ErrorState what="this workflow" error={error} onRetry={() => void refetch()} />;
   }
+
   if (!workflow) return <DetailsSkeleton />;
 
   return (
@@ -194,20 +201,34 @@ export function WorkflowDetailsPage() {
               />
               Enabled
             </label>
+
+            <Link
+              to={`/workflows/${workflow.id}/edit`}
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              Edit
+            </Link>
+
             <Button
               disabled={!workflow.enabled || run.isPending}
               title={workflow.enabled ? undefined : 'Enable the workflow to run it'}
               onClick={() => run.mutate(newRunVariables(workflow.id))}
             >
-              {run.isPending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Play aria-hidden="true" />}
+              {run.isPending ? (
+                <LoaderCircle className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Play aria-hidden="true" />
+              )}
               Run workflow
             </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" aria-label="More actions">
                   <Ellipsis aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
+
               <DropdownMenuContent>
                 <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
                   Delete
@@ -224,12 +245,15 @@ export function WorkflowDetailsPage() {
           <TabsTrigger value="executions">Executions</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
         </TabsList>
+
         <TabsContent value="overview">
           <OverviewTab workflow={workflow} />
         </TabsContent>
+
         <TabsContent value="executions">
           <ExecutionsTab workflowId={workflow.id} />
         </TabsContent>
+
         <TabsContent value="configuration">
           <ConfigurationTab workflow={workflow} />
         </TabsContent>

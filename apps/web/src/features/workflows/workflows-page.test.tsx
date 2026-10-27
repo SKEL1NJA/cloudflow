@@ -123,7 +123,9 @@ describe('WorkflowsPage list', () => {
     api();
     renderPage();
 
-    const video = (await screen.findByRole('link', { name: 'Video Processing' })).closest('tr') as HTMLElement;
+    const video = (await screen.findByRole('link', { name: 'Video Processing' })).closest(
+      'tr',
+    ) as HTMLElement;
     expect(within(video).getByRole('switch', { name: 'Video Processing enabled' })).toBeChecked();
     expect(within(video).getByText('3')).toBeInTheDocument();
     expect(within(video).getByText('Success')).toBeInTheDocument();
@@ -144,7 +146,9 @@ describe('WorkflowsPage list', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search workflows' }), 'video');
 
     await waitFor(() => expect(router.state.location.search).toBe('?q=video'), { timeout: 2000 });
-    await waitFor(() => expect(requestedUrls(fetchMock).some((url) => url.includes('search=video'))).toBe(true));
+    await waitFor(() =>
+      expect(requestedUrls(fetchMock).some((url) => url.includes('search=video'))).toBe(true),
+    );
     expect(requestedUrls(fetchMock).filter((url) => url.includes('search='))).toHaveLength(1);
   });
 
@@ -156,7 +160,9 @@ describe('WorkflowsPage list', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Enabled' }));
 
     expect(router.state.location.search).toBe('?status=enabled');
-    await waitFor(() => expect(requestedUrls(fetchMock).some((url) => url.includes('enabled=true'))).toBe(true));
+    await waitFor(() =>
+      expect(requestedUrls(fetchMock).some((url) => url.includes('enabled=true'))).toBe(true),
+    );
   });
 
   it('sorts by a column and flips the direction on a second click', async () => {
@@ -166,13 +172,23 @@ describe('WorkflowsPage list', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Name' }));
     expect(router.state.location.search).toBe('?sort=name&order=asc');
-    expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'Name' }));
     expect(router.state.location.search).toBe('?sort=name');
-    expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
     await waitFor(() =>
-      expect(requestedUrls(fetchMock).some((url) => url.includes('sortBy=name') && url.includes('sortOrder=desc'))).toBe(true),
+      expect(
+        requestedUrls(fetchMock).some(
+          (url) => url.includes('sortBy=name') && url.includes('sortOrder=desc'),
+        ),
+      ).toBe(true),
     );
   });
 
@@ -185,7 +201,9 @@ describe('WorkflowsPage list', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(router.state.location.search).toBe('?page=2');
-    await waitFor(() => expect(requestedUrls(fetchMock).some((url) => url.includes('page=2'))).toBe(true));
+    await waitFor(() =>
+      expect(requestedUrls(fetchMock).some((url) => url.includes('page=2'))).toBe(true),
+    );
   });
 
   it('shows the empty states', async () => {
@@ -283,7 +301,9 @@ describe('WorkflowsPage actions', () => {
     renderPage();
     const deletes = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Actions for Video Processing' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Actions for Video Processing' }),
+    );
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('alertdialog');
     expect(within(dialog).getByText('Delete "Video Processing"?')).toBeInTheDocument();
@@ -294,7 +314,11 @@ describe('WorkflowsPage actions', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Actions for Video Processing' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete workflow' }));
+    await userEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: 'Delete workflow',
+      }),
+    );
 
     await waitFor(() => expect(deletes()).toHaveLength(1));
     expect(String(deletes()[0]?.[0])).toContain(`/workflows/${videoProcessing.id}`);

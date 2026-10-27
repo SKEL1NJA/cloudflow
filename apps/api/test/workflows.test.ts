@@ -74,6 +74,42 @@ describe('POST /workflows', () => {
       'delay beyond the limit',
       { steps: [{ type: 'DELAY', name: 'x', config: { durationMs: 999_999_999 } }] },
     ],
+    [
+      'reserved header',
+      {
+        steps: [
+          {
+            type: 'HTTP_REQUEST',
+            name: 'x',
+            config: { url: 'https://example.com', headers: { Host: 'evil.example' } },
+          },
+        ],
+      },
+    ],
+    [
+      'invalid header name',
+      {
+        steps: [
+          {
+            type: 'HTTP_REQUEST',
+            name: 'x',
+            config: { url: 'https://example.com', headers: { 'Bad Name': '1' } },
+          },
+        ],
+      },
+    ],
+    [
+      'duplicate header names ignoring case',
+      {
+        steps: [
+          {
+            type: 'HTTP_REQUEST',
+            name: 'x',
+            config: { url: 'https://example.com', headers: { 'X-Key': '1', 'x-key': '2' } },
+          },
+        ],
+      },
+    ],
   ])('rejects an invalid definition: %s', async (_label, overrides) => {
     const res = await app.inject({
       method: 'POST',
@@ -83,6 +119,17 @@ describe('POST /workflows', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(errorCode(res.body)).toBe('VALIDATION_ERROR');
+  });
+
+  it('explains validation problems in plain language', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/workflows',
+      headers: authHeader(token),
+      payload: sampleWorkflow({ steps: [] }),
+    });
+    const body = res.json<{ error: { details: { message: string }[] } }>();
+    expect(body.error.details.map((issue) => issue.message)).toContain('Add at least one step');
   });
 
   it('rejects a duplicate name for the same user', async () => {
