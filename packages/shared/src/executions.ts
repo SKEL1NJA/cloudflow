@@ -24,6 +24,10 @@ export const executionListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   status: z.enum(EXECUTION_STATUSES).optional(),
   workflowId: z.uuid().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  minDurationMs: z.coerce.number().int().min(0).optional(),
+  maxDurationMs: z.coerce.number().int().min(0).optional(),
 });
 
 export type RunWorkflowBody = z.infer<typeof runWorkflowBodySchema>;
@@ -53,6 +57,7 @@ export interface ExecutionSummary {
   status: ExecutionStatus;
   error: string | null;
   stepCount: number;
+  attempts: number;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;

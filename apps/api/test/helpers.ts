@@ -62,6 +62,9 @@ export interface SeedExecutionOptions {
   stepStatuses?: StepExecutionStatus[];
   createdAt?: Date;
   stepFinishedAt?: Date;
+  startedAt?: Date;
+  finishedAt?: Date;
+  attempts?: number[];
 }
 
 export function seedExecution(
@@ -75,13 +78,19 @@ export function seedExecution(
     stepStatuses = [],
     createdAt = new Date(),
     stepFinishedAt = createdAt,
+    startedAt,
+    finishedAt,
+    attempts = [],
   } = options;
+
   return app.prisma.workflowExecution.create({
     data: {
       workflowId: workflow.id,
       userId,
       status,
       createdAt,
+      ...(startedAt && { startedAt }),
+      ...(finishedAt && { finishedAt }),
       steps: {
         create: workflow.steps.map((step, position) => {
           const stepStatus = stepStatuses[position] ?? 'PENDING';
@@ -93,6 +102,7 @@ export function seedExecution(
             name: step.name,
             config: step.config as Prisma.InputJsonValue,
             status: stepStatus,
+            attempts: attempts[position] ?? 0,
             finishedAt: finished ? stepFinishedAt : null,
           };
         }),

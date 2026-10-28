@@ -8,14 +8,25 @@ interface ExecutionsTableProps {
   rows: ExecutionSummary[];
   caption: string;
   showWorkflow?: boolean;
+  showAttempts?: boolean;
 }
 
-export function ExecutionsTable({ rows, caption, showWorkflow = true }: ExecutionsTableProps) {
+export function ExecutionsTable({
+  rows,
+  caption,
+  showWorkflow = true,
+  showAttempts = false,
+}: ExecutionsTableProps) {
   const navigate = useNavigate();
   const now = useNow(30_000);
-  const headers = showWorkflow
-    ? ['Execution', 'Workflow', 'Status', 'Duration', 'Started']
-    : ['Execution', 'Status', 'Duration', 'Started'];
+  const headers = [
+    'Execution',
+    ...(showWorkflow ? ['Workflow'] : []),
+    'Status',
+    'Duration',
+    'Started',
+    ...(showAttempts ? ['Attempts'] : []),
+  ];
 
   return (
     <div className="overflow-x-auto">
@@ -63,6 +74,14 @@ export function ExecutionsTable({ rows, caption, showWorkflow = true }: Executio
                 >
                   {formatRelativeTime(started, now)}
                 </td>
+                {showAttempts ? (
+                  <td
+                    className="px-5 py-2.5 tabular-nums text-muted-foreground"
+                    title={`${execution.attempts} attempts across ${execution.stepCount} steps`}
+                  >
+                    {execution.attempts}
+                  </td>
+                ) : null}
               </tr>
             );
           })}

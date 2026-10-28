@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router';
 import { RequireAnonymous, RequireAuth } from '@/auth/guards';
 import { AppShell } from '@/components/layout/app-shell';
+import { ExecutionDetailsPage } from '@/features/executions/execution-details-page';
+import { ExecutionsPage } from '@/features/executions/executions-page';
 import { OverviewPage } from '@/features/overview/overview-page';
 import { WorkflowDetailsPage } from '@/features/workflows/workflow-details-page';
 import { CreateWorkflowPage, EditWorkflowPage } from '@/features/workflows/workflow-form-page';
@@ -64,19 +66,12 @@ export const router = createBrowserRouter([
               {
                 path: 'executions',
                 handle: { title: 'Executions' },
-                element: (
-                  <PlaceholderPage title="Executions" description="Every run, step by step." />
-                ),
+                element: <ExecutionsPage />,
               },
               {
                 path: 'executions/:id',
                 handle: { title: 'Execution' },
-                element: (
-                  <PlaceholderPage
-                    title="Execution"
-                    description="Step-by-step details for one run."
-                  />
-                ),
+                element: <ExecutionDetailsPage />,
               },
               {
                 path: 'workers',

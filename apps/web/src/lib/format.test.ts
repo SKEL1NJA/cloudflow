@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount, formatDuration, formatRelativeTime, shortExecutionId } from './format';
+import {
+  formatCount,
+  formatCountdown,
+  formatDuration,
+  formatLogTime,
+  formatRelativeTime,
+  shortExecutionId,
+} from './format';
 
 describe('formatDuration', () => {
   it.each([
@@ -51,5 +58,23 @@ describe('small helpers', () => {
 
   it('formats counts with grouping', () => {
     expect(formatCount(1234567)).toBe(new Intl.NumberFormat().format(1234567));
+  });
+});
+
+describe('formatCountdown', () => {
+  it.each([
+    [1, '1 second'],
+    [4, '4 seconds'],
+    [59, '59 seconds'],
+    [60, '1m'],
+    [125, '2m 5s'],
+  ])('shows %s seconds as %s', (seconds, expected) => {
+    expect(formatCountdown(seconds)).toBe(expected);
+  });
+});
+
+describe('formatLogTime', () => {
+  it('shows local time with milliseconds', () => {
+    expect(formatLogTime(new Date(2026, 9, 20, 14, 5, 9, 7).toISOString())).toBe('14:05:09.007');
   });
 });

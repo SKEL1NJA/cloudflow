@@ -1,6 +1,6 @@
 import type { WorkflowDetail } from '@cloudflow/shared';
 import { Ellipsis, Inbox, LoaderCircle, Play } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { z } from 'zod';
 import { ApiError } from '@/api/errors';
@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/layout/error-state';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Stat } from '@/components/ui/stat';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,15 +32,6 @@ import { maskedDefinition } from './step-summary';
 import { WorkflowNotFound } from './workflow-not-found';
 
 const tabSchema = z.enum(['overview', 'executions', 'configuration']).catch('overview');
-
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="rounded-lg border bg-card p-4 shadow-xs">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="mt-1.5 text-sm">{children}</dd>
-    </div>
-  );
-}
 
 function OverviewTab({ workflow }: { workflow: WorkflowDetail }) {
   const now = useNow(30_000);

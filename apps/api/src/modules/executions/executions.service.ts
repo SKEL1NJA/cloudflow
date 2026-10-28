@@ -3,6 +3,7 @@ import { enqueueRecovery, enqueueStep, type StepQueue } from '@cloudflow/queue';
 import type {
   ExecutionDetail,
   ExecutionListQuery,
+  ExecutionStatus,
   ExecutionSummary,
   JsonValue,
   Paginated,
@@ -38,6 +39,7 @@ function toDetail(row: ExecutionWithSteps): ExecutionDetail {
     status: row.status,
     error: row.error,
     stepCount: row.steps.length,
+    attempts: row.steps.reduce((sum, step) => sum + step.attempts, 0),
     createdAt: row.createdAt.toISOString(),
     startedAt: iso(row.startedAt),
     finishedAt: iso(row.finishedAt),
@@ -204,39 +206,92 @@ export async function getExecution(
   return toDetail(row);
 }
 
+interface ListRow {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: string;
+  error: string | null;
+  stepCount: bigint;
+  attempts: bigint;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+}
+
+function buildFilter(userId: string, query: ExecutionListQuery): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [Prisma.sql`e.user_id = ${userId}::uuid`];
+
+  if (query.status) conditions.push(Prisma.sql`e.status::text = ${query.status}`);
+  if (query.workflowId) conditions.push(Prisma.sql`e.workflow_id = ${query.workflowId}::uuid`);
+  if (query.from) conditions.push(Prisma.sql`e.created_at >= ${query.from}::timestamptz`);
+  if (query.to) conditions.push(Prisma.sql`e.created_at <= ${query.to}::timestamptz`);
+
+  if (query.minDurationMs !== undefined || query.maxDurationMs !== undefined) {
+    conditions.push(Prisma.sql`e.started_at IS NOT NULL AND e.finished_at IS NOT NULL`);
+
+    const elapsed = Prisma.sql`EXTRACT(EPOCH FROM (e.finished_at - e.started_at)) * 1000`;
+
+    if (query.minDurationMs !== undefined) {
+      conditions.push(Prisma.sql`${elapsed} >= ${query.minDurationMs}::double precision`);
+    }
+
+    if (query.maxDurationMs !== undefined) {
+      conditions.push(Prisma.sql`${elapsed} <= ${query.maxDurationMs}::double precision`);
+    }
+  }
+
+  return Prisma.join(conditions, ' AND ');
+}
+
 export async function listExecutions(
   prisma: PrismaClient,
   userId: string,
   query: ExecutionListQuery,
 ): Promise<Paginated<ExecutionSummary>> {
-  const where: Prisma.WorkflowExecutionWhereInput = {
-    userId,
-    ...(query.status && { status: query.status }),
-    ...(query.workflowId && { workflowId: query.workflowId }),
-  };
+  const where = buildFilter(userId, query);
+  const offset = (query.page - 1) * query.pageSize;
 
-  const [total, rows] = await prisma.$transaction([
-    prisma.workflowExecution.count({ where }),
-    prisma.workflowExecution.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      skip: (query.page - 1) * query.pageSize,
-      take: query.pageSize,
-      include: {
-        workflow: { select: { name: true } },
-        _count: { select: { steps: true } },
-      },
-    }),
+  const [counted, rows] = await prisma.$transaction([
+    prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*) AS total
+      FROM workflow_executions e
+      WHERE ${where}`,
+    prisma.$queryRaw<ListRow[]>`
+      SELECT e.id,
+             e.workflow_id AS "workflowId",
+             w.name AS "workflowName",
+             e.status::text AS status,
+             e.error,
+             s.step_count AS "stepCount",
+             s.attempts,
+             e.created_at AS "createdAt",
+             e.started_at AS "startedAt",
+             e.finished_at AS "finishedAt"
+      FROM workflow_executions e
+      JOIN workflows w ON w.id = e.workflow_id
+      LEFT JOIN LATERAL (
+        SELECT count(*) AS step_count,
+               COALESCE(sum(attempts), 0) AS attempts
+        FROM step_executions
+        WHERE execution_id = e.id
+      ) s ON true
+      WHERE ${where}
+      ORDER BY e.created_at DESC, e.id DESC
+      LIMIT ${query.pageSize}::int OFFSET ${offset}::int`,
   ]);
+
+  const total = Number(counted[0]?.total ?? 0);
 
   return {
     data: rows.map((row) => ({
       id: row.id,
       workflowId: row.workflowId,
-      workflowName: row.workflow.name,
-      status: row.status,
+      workflowName: row.workflowName,
+      status: row.status as ExecutionStatus,
       error: row.error,
-      stepCount: row._count.steps,
+      stepCount: Number(row.stepCount),
+      attempts: Number(row.attempts),
       createdAt: row.createdAt.toISOString(),
       startedAt: iso(row.startedAt),
       finishedAt: iso(row.finishedAt),

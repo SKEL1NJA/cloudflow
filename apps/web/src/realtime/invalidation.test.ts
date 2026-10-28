@@ -59,6 +59,7 @@ describe('createInvalidator', () => {
       ['workflows', 'list'],
       ['workflows', 'detail', WORKFLOW],
       ['executions', 'detail', EXECUTION],
+      ['executions', 'logs', EXECUTION],
     ]);
   });
 
@@ -68,7 +69,7 @@ describe('createInvalidator', () => {
     invalidator.handleEvent(stepEvent);
 
     vi.advanceTimersByTime(300);
-    expect(invalidate).toHaveBeenCalledTimes(6);
+    expect(invalidate).toHaveBeenCalledTimes(7);
   });
 
   it('only refreshes the execution itself for step updates', () => {
@@ -76,7 +77,10 @@ describe('createInvalidator', () => {
     invalidator.handleEvent(stepEvent);
 
     vi.advanceTimersByTime(300);
-    expect(invalidatedKeys()).toEqual([['executions', 'detail', EXECUTION]]);
+    expect(invalidatedKeys()).toEqual([
+      ['executions', 'detail', EXECUTION],
+      ['executions', 'logs', EXECUTION],
+    ]);
   });
 
   it('refreshes everything immediately on resync and drops pending work', () => {

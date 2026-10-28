@@ -40,6 +40,7 @@ export function createInvalidator(queryClient: QueryClient, delayMs = 300): Inva
         schedule(queryKeys.workflows.detail(event.workflowId));
       }
       schedule(queryKeys.executions.detail(event.executionId));
+      schedule(queryKeys.executions.logs(event.executionId));
     },
 
     handleResync() {
