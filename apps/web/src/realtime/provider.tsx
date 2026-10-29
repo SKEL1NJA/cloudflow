@@ -2,10 +2,13 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
+import { useNavigate } from 'react-router';
+import { notifyExecution } from '@/features/notifications/notify';
 import { queryClient } from '@/lib/query-client';
 import { createRealtimeClient, type RealtimeClient, type RealtimeStatus } from './client';
 import { createInvalidator } from './invalidation';
@@ -13,10 +16,20 @@ import { createInvalidator } from './invalidation';
 const RealtimeContext = createContext<RealtimeClient | null>(null);
 
 export function RealtimeProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
   const [{ client, invalidator }] = useState(() => {
     const invalidator = createInvalidator(queryClient);
     const client = createRealtimeClient({
-      onEvent: invalidator.handleEvent,
+      onEvent: (event) => {
+        invalidator.handleEvent(event);
+        notifyExecution(event, { open: (path) => void navigateRef.current(path) });
+      },
       onResync: invalidator.handleResync,
     });
     return { client, invalidator };

@@ -5,6 +5,7 @@ import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import { env } from './config/env.js';
 import { safeRequestId } from './lib/request-id.js';
 import { apiKeyRoutes } from './modules/api-keys/api-keys.routes.js';
+import { accountRoutes } from './modules/auth/account.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { eventRoutes } from './modules/events/events.routes.js';
 import { executionRoutes } from './modules/executions/executions.routes.js';
@@ -84,6 +85,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   void app.register(healthRoutes);
   void app.register(authRoutes);
+  void app.register(accountRoutes);
   void app.register(workflowRoutes);
   void app.register(executionRoutes);
   void app.register(overviewRoutes);

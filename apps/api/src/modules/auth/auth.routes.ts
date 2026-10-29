@@ -11,20 +11,11 @@ import {
   clearRefreshCookie,
   setRefreshCookie,
 } from './cookies.js';
-import { burnPasswordCheck, hashPassword, verifyPassword } from './password.js';
+import { hashPassword, verifyPassword, burnPasswordCheck } from './password.js';
+import { toPublicUser } from './public-user.js';
+import { sessionMeta } from './session-meta.js';
 import { revokeAllSessions, revokeSession, rotateSession, startSession } from './sessions.js';
 import { signAccessToken } from './tokens.js';
-
-interface PublicUser {
-  id: string;
-  email: string;
-  name: string | null;
-  createdAt: Date;
-}
-
-function toPublicUser(user: PublicUser): PublicUser {
-  return { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt };
-}
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
   app.post(
@@ -38,10 +29,8 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
         const user = await app.prisma.user.create({
           data: { email: input.email, passwordHash, name: input.name },
         });
-        const [accessToken, session] = await Promise.all([
-          signAccessToken(user.id),
-          startSession(app.prisma, user.id),
-        ]);
+        const session = await startSession(app.prisma, user.id, sessionMeta(request));
+        const accessToken = await signAccessToken(user.id, session.familyId);
         setRefreshCookie(reply, session);
         return reply.status(201).send({ user: toPublicUser(user), accessToken });
       } catch (err) {
@@ -87,10 +76,8 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     await app.limiter.reset(pairRule, pairKey);
-    const [accessToken, session] = await Promise.all([
-      signAccessToken(user.id),
-      startSession(app.prisma, user.id),
-    ]);
+    const session = await startSession(app.prisma, user.id, sessionMeta(request));
+    const accessToken = await signAccessToken(user.id, session.familyId);
     setRefreshCookie(reply, session);
     return { user: toPublicUser(user), accessToken };
   });
@@ -104,11 +91,18 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
       if (presented) {
         try {
-          const { userId, issued } = await rotateSession(app.prisma, presented);
+          const { userId, issued } = await rotateSession(
+            app.prisma,
+            presented,
+            sessionMeta(request),
+          );
           const user = await app.prisma.user.findUnique({ where: { id: userId } });
           if (user) {
             setRefreshCookie(reply, issued);
-            return { user: toPublicUser(user), accessToken: await signAccessToken(user.id) };
+            return {
+              user: toPublicUser(user),
+              accessToken: await signAccessToken(user.id, issued.familyId),
+            };
           }
         } catch (err) {
           if (!(err instanceof UnauthorizedError)) throw err;

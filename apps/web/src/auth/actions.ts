@@ -10,6 +10,7 @@ export async function signIn(input: LoginInput): Promise<void> {
     auth: false,
     credentials: true,
   });
+
   sessionStore.setSession(response.user, response.accessToken);
 }
 
@@ -20,13 +21,27 @@ export async function signUp(input: RegisterInput): Promise<void> {
     auth: false,
     credentials: true,
   });
+
   sessionStore.setSession(response.user, response.accessToken);
 }
 
 export async function signOut(): Promise<void> {
-  await request<void>('/auth/logout', { method: 'POST', auth: false, credentials: true }).catch(
-    () => undefined,
-  );
+  await request<void>('/auth/logout', {
+    method: 'POST',
+    auth: false,
+    credentials: true,
+  }).catch(() => undefined);
+
+  sessionStore.signOut();
+  queryClient.clear();
+}
+
+export async function signOutEverywhere(): Promise<void> {
+  await request<void>('/auth/logout-all', {
+    method: 'POST',
+    credentials: true,
+  });
+
   sessionStore.signOut();
   queryClient.clear();
 }

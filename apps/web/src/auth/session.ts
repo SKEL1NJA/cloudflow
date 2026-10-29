@@ -32,6 +32,12 @@ export const sessionStore = {
     update({ status: 'authenticated', user, accessToken });
   },
 
+  updateUser(user: AuthUser): void {
+    if (state.status === 'authenticated') {
+      update({ ...state, user });
+    }
+  },
+
   expire(): void {
     update({ status: 'anonymous', expired: state.status === 'authenticated' });
   },

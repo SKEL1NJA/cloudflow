@@ -7,6 +7,7 @@ import { verifyAccessToken } from '../modules/auth/tokens.js';
 declare module 'fastify' {
   interface FastifyRequest {
     userId: string | null;
+    sessionId: string | null;
     authMethod: 'session' | 'apiKey' | null;
   }
   interface FastifyInstance {
@@ -17,6 +18,7 @@ declare module 'fastify' {
 
 export function registerAuth(app: FastifyInstance): void {
   app.decorateRequest('userId', null);
+  app.decorateRequest('sessionId', null);
   app.decorateRequest('authMethod', null);
 
   app.decorate('authenticate', async (request: FastifyRequest): Promise<void> => {
@@ -43,8 +45,9 @@ export function registerAuth(app: FastifyInstance): void {
     }
 
     try {
-      const { userId } = await verifyAccessToken(token);
+      const { userId, sessionId } = await verifyAccessToken(token);
       request.userId = userId;
+      request.sessionId = sessionId;
       request.authMethod = 'session';
     } catch {
       throw new UnauthorizedError('Invalid or expired token');

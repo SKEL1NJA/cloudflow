@@ -2,12 +2,23 @@ import type { Prisma, PrismaClient } from '@cloudflow/db';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { env } from '../../config/env.js';
 import { sha256Hex } from '../../lib/crypto.js';
-import { UnauthorizedError } from '../../lib/errors.js';
+import { NotFoundError, UnauthorizedError } from '../../lib/errors.js';
+import type { SessionMeta } from './session-meta.js';
 
 const DAY_MS = 86_400_000;
 
 export interface IssuedRefreshToken {
   token: string;
+  expiresAt: Date;
+  familyId: string;
+}
+
+export interface ActiveSession {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  signedInAt: Date;
+  lastActiveAt: Date;
   expiresAt: Date;
 }
 
@@ -17,7 +28,13 @@ export function hashRefreshToken(token: string): string {
 
 async function insertToken(
   db: Prisma.TransactionClient,
-  params: { userId: string; familyId: string; sessionExpiresAt: Date; nowMs: number },
+  params: {
+    userId: string;
+    familyId: string;
+    sessionExpiresAt: Date;
+    nowMs: number;
+    meta: SessionMeta;
+  },
 ): Promise<IssuedRefreshToken> {
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(
@@ -30,18 +47,25 @@ async function insertToken(
       tokenHash: hashRefreshToken(token),
       expiresAt,
       sessionExpiresAt: params.sessionExpiresAt,
+      userAgent: params.meta.userAgent,
+      ipAddress: params.meta.ip,
     },
   });
-  return { token, expiresAt };
+  return { token, expiresAt, familyId: params.familyId };
 }
 
-export function startSession(prisma: PrismaClient, userId: string): Promise<IssuedRefreshToken> {
+export function startSession(
+  prisma: PrismaClient,
+  userId: string,
+  meta: SessionMeta,
+): Promise<IssuedRefreshToken> {
   const nowMs = Date.now();
   return insertToken(prisma, {
     userId,
     familyId: randomUUID(),
     sessionExpiresAt: new Date(nowMs + env.SESSION_MAX_DAYS * DAY_MS),
     nowMs,
+    meta,
   });
 }
 
@@ -55,6 +79,7 @@ function revokeFamily(prisma: PrismaClient, familyId: string) {
 export async function rotateSession(
   prisma: PrismaClient,
   presented: string,
+  meta: SessionMeta,
 ): Promise<{ userId: string; issued: IssuedRefreshToken }> {
   const row = await prisma.refreshToken.findUnique({
     where: { tokenHash: hashRefreshToken(presented) },
@@ -75,6 +100,7 @@ export async function rotateSession(
       familyId: row.familyId,
       sessionExpiresAt: row.sessionExpiresAt,
       nowMs: now.getTime(),
+      meta,
     });
   });
 
@@ -97,5 +123,79 @@ export async function revokeAllSessions(prisma: PrismaClient, userId: string): P
   await prisma.refreshToken.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
+  });
+}
+
+export async function listActiveSessions(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<ActiveSession[]> {
+  return prisma.$queryRaw<ActiveSession[]>`
+    SELECT latest.family_id AS id,
+           latest.user_agent AS "userAgent",
+           latest.ip_address AS "ipAddress",
+           origin.signed_in_at AS "signedInAt",
+           latest.created_at AS "lastActiveAt",
+           latest.session_expires_at AS "expiresAt"
+    FROM (
+      SELECT DISTINCT ON (family_id)
+             family_id, user_agent, ip_address, created_at, expires_at, session_expires_at
+      FROM refresh_tokens
+      WHERE user_id = ${userId}::uuid AND revoked_at IS NULL
+      ORDER BY family_id, created_at DESC
+    ) latest
+    JOIN (
+      SELECT family_id, min(created_at) AS signed_in_at
+      FROM refresh_tokens
+      WHERE user_id = ${userId}::uuid
+      GROUP BY family_id
+    ) origin ON origin.family_id = latest.family_id
+    WHERE latest.expires_at > now() AND latest.session_expires_at > now()
+    ORDER BY latest.created_at DESC`;
+}
+
+export async function revokeSessionById(
+  prisma: PrismaClient,
+  userId: string,
+  familyId: string,
+): Promise<void> {
+  const { count } = await prisma.refreshToken.updateMany({
+    where: { userId, familyId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  if (count === 0) {
+    const existing = await prisma.refreshToken.findFirst({
+      where: { userId, familyId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundError('Session not found');
+  }
+}
+
+export async function revokeSessionsExcept(
+  prisma: PrismaClient,
+  userId: string,
+  keepFamilyId: string | null,
+): Promise<number> {
+  const now = new Date();
+  const others = keepFamilyId ? { familyId: { not: keepFamilyId } } : {};
+
+  return prisma.$transaction(async (tx) => {
+    const active = await tx.refreshToken.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+        sessionExpiresAt: { gt: now },
+        ...others,
+      },
+      distinct: ['familyId'],
+      select: { familyId: true },
+    });
+    await tx.refreshToken.updateMany({
+      where: { userId, revokedAt: null, ...others },
+      data: { revokedAt: now },
+    });
+    return active.length;
   });
 }

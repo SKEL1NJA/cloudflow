@@ -10,6 +10,7 @@ import { WorkersPage } from '@/features/workers/workers-page';
 import { WorkflowDetailsPage } from '@/features/workflows/workflow-details-page';
 import { CreateWorkflowPage, EditWorkflowPage } from '@/features/workflows/workflow-form-page';
 import { WorkflowsPage } from '@/features/workflows/workflows-page';
+import { SettingsPage } from '@/features/settings/settings-page';
 import { LoginPage } from '@/pages/login';
 import { NotFoundPage } from '@/pages/not-found';
 import { PlaceholderPage } from '@/pages/placeholder';
@@ -76,18 +77,25 @@ export const router = createBrowserRouter([
                 handle: { title: 'Execution' },
                 element: <ExecutionDetailsPage />,
               },
-              { path: 'workers', handle: { title: 'Workers' }, element: <WorkersPage /> },
-              { path: 'queue', handle: { title: 'Queue' }, element: <QueuePage /> },
-              { path: 'logs', handle: { title: 'Logs' }, element: <LogsPage /> },
+              {
+                path: 'workers',
+                handle: { title: 'Workers' },
+                element: <WorkersPage />,
+              },
+              {
+                path: 'queue',
+                handle: { title: 'Queue' },
+                element: <QueuePage />,
+              },
+              {
+                path: 'logs',
+                handle: { title: 'Logs' },
+                element: <LogsPage />,
+              },
               {
                 path: 'settings',
                 handle: { title: 'Settings' },
-                element: (
-                  <PlaceholderPage
-                    title="Settings"
-                    description="Account, API keys and appearance."
-                  />
-                ),
+                element: <SettingsPage />,
               },
               {
                 path: '*',

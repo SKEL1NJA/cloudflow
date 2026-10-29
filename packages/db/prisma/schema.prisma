@@ -192,6 +192,8 @@ model RefreshToken {
   sessionExpiresAt DateTime  @map("session_expires_at") @db.Timestamptz(3)
   usedAt           DateTime? @map("used_at") @db.Timestamptz(3)
   revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  userAgent        String?   @map("user_agent")
+  ipAddress        String?   @map("ip_address")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
