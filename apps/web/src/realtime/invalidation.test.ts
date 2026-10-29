@@ -60,6 +60,7 @@ describe('createInvalidator', () => {
       ['workflows', 'detail', WORKFLOW],
       ['executions', 'detail', EXECUTION],
       ['executions', 'logs', EXECUTION],
+      ['queue'],
     ]);
   });
 
@@ -69,7 +70,7 @@ describe('createInvalidator', () => {
     invalidator.handleEvent(stepEvent);
 
     vi.advanceTimersByTime(300);
-    expect(invalidate).toHaveBeenCalledTimes(7);
+    expect(invalidate).toHaveBeenCalledTimes(8);
   });
 
   it('only refreshes the execution itself for step updates', () => {
@@ -80,6 +81,7 @@ describe('createInvalidator', () => {
     expect(invalidatedKeys()).toEqual([
       ['executions', 'detail', EXECUTION],
       ['executions', 'logs', EXECUTION],
+      ['queue'],
     ]);
   });
 

@@ -97,6 +97,34 @@ describe('heartbeat', () => {
     await redis.del(workerKey(workerId));
   });
 
+  it('reports the uptime a stopped worker had, not a number that keeps growing', async () => {
+    const workerId = `stopped-${randomUUID()}`;
+    const startedAt = new Date(Date.now() - 3_600_000).toISOString();
+    const lastHeartbeat = new Date(Date.now() - 1_800_000).toISOString();
+    await redis.set(
+      workerKey(workerId),
+      JSON.stringify({
+        workerId,
+        hostname: 'host',
+        pid: 1,
+        concurrency: 2,
+        startedAt,
+        lastHeartbeat,
+        stopped: false,
+        processing: 0,
+        completed: 0,
+        failed: 0,
+      }),
+      'EX',
+      60,
+    );
+
+    const worker = (await listWorkers(redis)).find((entry) => entry.workerId === workerId);
+    expect(worker?.status).toBe('offline');
+    expect(worker?.uptimeSeconds).toBe(1800);
+    await redis.del(workerKey(workerId));
+  });
+
   it('ignores corrupt records instead of failing the whole listing', async () => {
     const key = workerKey(`garbage-${randomUUID()}`);
     await redis.set(key, 'this is not json', 'EX', 60);

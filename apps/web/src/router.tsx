@@ -3,7 +3,10 @@ import { RequireAnonymous, RequireAuth } from '@/auth/guards';
 import { AppShell } from '@/components/layout/app-shell';
 import { ExecutionDetailsPage } from '@/features/executions/execution-details-page';
 import { ExecutionsPage } from '@/features/executions/executions-page';
+import { LogsPage } from '@/features/logs/logs-page';
 import { OverviewPage } from '@/features/overview/overview-page';
+import { QueuePage } from '@/features/queue/queue-page';
+import { WorkersPage } from '@/features/workers/workers-page';
 import { WorkflowDetailsPage } from '@/features/workflows/workflow-details-page';
 import { CreateWorkflowPage, EditWorkflowPage } from '@/features/workflows/workflow-form-page';
 import { WorkflowsPage } from '@/features/workflows/workflows-page';
@@ -73,30 +76,9 @@ export const router = createBrowserRouter([
                 handle: { title: 'Execution' },
                 element: <ExecutionDetailsPage />,
               },
-              {
-                path: 'workers',
-                handle: { title: 'Workers' },
-                element: (
-                  <PlaceholderPage
-                    title="Workers"
-                    description="Processes that execute your steps."
-                  />
-                ),
-              },
-              {
-                path: 'queue',
-                handle: { title: 'Queue' },
-                element: (
-                  <PlaceholderPage title="Queue" description="Work waiting to be processed." />
-                ),
-              },
-              {
-                path: 'logs',
-                handle: { title: 'Logs' },
-                element: (
-                  <PlaceholderPage title="Logs" description="Search what your workflows did." />
-                ),
-              },
+              { path: 'workers', handle: { title: 'Workers' }, element: <WorkersPage /> },
+              { path: 'queue', handle: { title: 'Queue' }, element: <QueuePage /> },
+              { path: 'logs', handle: { title: 'Logs' }, element: <LogsPage /> },
               {
                 path: 'settings',
                 handle: { title: 'Settings' },

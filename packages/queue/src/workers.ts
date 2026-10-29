@@ -87,10 +87,13 @@ export async function listWorkers(redis: Redis, nowMs = Date.now()): Promise<Wor
   for (const raw of values) {
     const heartbeat = parseHeartbeat(raw);
     if (!heartbeat) continue;
+    const status = computeWorkerStatus(heartbeat, nowMs);
+    const endMs =
+      status === 'offline' ? Math.min(nowMs, Date.parse(heartbeat.lastHeartbeat)) : nowMs;
     workers.push({
       ...heartbeat,
-      status: computeWorkerStatus(heartbeat, nowMs),
-      uptimeSeconds: Math.max(0, Math.round((nowMs - Date.parse(heartbeat.startedAt)) / 1000)),
+      status,
+      uptimeSeconds: Math.max(0, Math.round((endMs - Date.parse(heartbeat.startedAt)) / 1000)),
     });
   }
   return workers.sort((a, b) => a.startedAt.localeCompare(b.startedAt));

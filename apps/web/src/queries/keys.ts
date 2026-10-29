@@ -17,4 +17,13 @@ export const queryKeys = {
     detail: (id: string) => ['workflows', 'detail', id] as const,
     options: ['workflows', 'options'] as const,
   },
+  workers: ['workers'] as const,
+  queue: {
+    all: ['queue'] as const,
+    counts: ['queue', 'counts'] as const,
+    activity: (range: StatsRange) => ['queue', 'activity', range] as const,
+  },
+  logs: {
+    list: (params: object) => ['logs', 'list', params] as const,
+  },
 };

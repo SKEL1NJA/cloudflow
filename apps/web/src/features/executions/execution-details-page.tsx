@@ -156,9 +156,17 @@ export function ExecutionDetailsPage() {
       </section>
 
       <section aria-labelledby="execution-log-heading" className="mt-8">
-        <h2 id="execution-log-heading" className="mb-3 text-sm font-medium">
-          Execution log
-        </h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 id="execution-log-heading" className="text-sm font-medium">
+            Execution log
+          </h2>
+          <Link
+            to={`/logs?execution=${execution.id}`}
+            className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Open in log viewer
+          </Link>
+        </div>
         {logsQuery.isError && !logsQuery.data ? (
           <ErrorState
             what="the execution log"

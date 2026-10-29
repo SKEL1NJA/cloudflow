@@ -1,13 +1,7 @@
-import type { LogEntry, LogLevel } from '@cloudflow/shared';
+import type { LogEntry } from '@cloudflow/shared';
 import { formatLogTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-const LEVEL_CLASS: Record<LogLevel, string> = {
-  DEBUG: 'text-muted-foreground',
-  INFO: 'text-muted-foreground',
-  WARN: 'text-warning',
-  ERROR: 'text-danger',
-};
+import { LEVEL_CLASS } from '@/features/logs/level';
 
 export function LogLines({ entries }: { entries: LogEntry[] }) {
   if (entries.length === 0) {

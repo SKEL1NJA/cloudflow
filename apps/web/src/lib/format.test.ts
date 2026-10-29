@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatLogTime,
   formatRelativeTime,
+  formatUptime,
   shortExecutionId,
 } from './format';
 
@@ -76,5 +77,20 @@ describe('formatCountdown', () => {
 describe('formatLogTime', () => {
   it('shows local time with milliseconds', () => {
     expect(formatLogTime(new Date(2026, 9, 20, 14, 5, 9, 7).toISOString())).toBe('14:05:09.007');
+  });
+});
+
+describe('formatUptime', () => {
+  it.each([
+    [0, '0s'],
+    [45, '45s'],
+    [60, '1m 0s'],
+    [125, '2m 5s'],
+    [3600, '1h 0m'],
+    [7500, '2h 5m'],
+    [86_400, '1d 0h'],
+    [200_000, '2d 7h'],
+  ])('shows %s seconds as %s', (seconds, expected) => {
+    expect(formatUptime(seconds)).toBe(expected);
   });
 });

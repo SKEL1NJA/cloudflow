@@ -41,6 +41,7 @@ export function createInvalidator(queryClient: QueryClient, delayMs = 300): Inva
       }
       schedule(queryKeys.executions.detail(event.executionId));
       schedule(queryKeys.executions.logs(event.executionId));
+      schedule(queryKeys.queue.all);
     },
 
     handleResync() {
