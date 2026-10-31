@@ -85,10 +85,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
+
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
@@ -106,6 +108,7 @@ jobs:
         with:
           context: .
           target: api
+          pull: true
           load: true
           tags: cloudflow/api:local
           cache-from: type=gha,scope=api
@@ -116,6 +119,7 @@ jobs:
         with:
           context: .
           target: worker
+          pull: true
           load: true
           tags: cloudflow/worker:local
           cache-from: type=gha,scope=worker
@@ -126,6 +130,7 @@ jobs:
         with:
           context: .
           target: migrate
+          pull: true
           load: true
           tags: cloudflow/migrate:local
           cache-from: type=gha,scope=migrate
@@ -136,6 +141,7 @@ jobs:
         with:
           context: .
           target: web
+          pull: true
           load: true
           tags: cloudflow/web:local
           build-args: VITE_API_URL=http://127.0.0.1:3000
@@ -206,6 +212,7 @@ jobs:
         with:
           context: .
           target: api
+          pull: true
           push: true
           tags: |
             ${{ env.PREFIX }}/api:latest
@@ -217,6 +224,7 @@ jobs:
         with:
           context: .
           target: worker
+          pull: true
           push: true
           tags: |
             ${{ env.PREFIX }}/worker:latest
@@ -228,6 +236,7 @@ jobs:
         with:
           context: .
           target: migrate
+          pull: true
           push: true
           tags: |
             ${{ env.PREFIX }}/migrate:latest
@@ -239,6 +248,7 @@ jobs:
         with:
           context: .
           target: web
+          pull: true
           push: true
           build-args: VITE_API_URL=${{ vars.VITE_API_URL || 'http://127.0.0.1:3000' }}
           tags: |
