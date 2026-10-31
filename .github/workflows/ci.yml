@@ -1,0 +1,247 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JWT_SECRET: ci-only-secret-that-is-at-least-32-characters-long
+  DATABASE_URL: postgresql://cloudflow:cloudflow@127.0.0.1:5432/cloudflow_test
+  TEST_DATABASE_URL: postgresql://cloudflow:cloudflow@127.0.0.1:5432/cloudflow_test
+  REDIS_URL: redis://127.0.0.1:6379
+
+jobs:
+  verify:
+    name: Typecheck, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cloudflow
+          POSTGRES_PASSWORD: cloudflow
+          POSTGRES_DB: cloudflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloudflow -d cloudflow_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate the Prisma client
+        run: npx prisma generate
+        working-directory: packages/db
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build the web app and enforce the bundle budget
+        run: |
+          npm run build -w apps/web
+          npm run report -w apps/web
+
+      - name: Bundle the API and the worker
+        run: |
+          npm run build:api
+          npm run build:worker
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  stack:
+    name: Docker images and full-stack smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: api
+          load: true
+          tags: cloudflow/api:local
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build the worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          load: true
+          tags: cloudflow/worker:local
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
+
+      - name: Build the migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrate
+          load: true
+          tags: cloudflow/migrate:local
+          cache-from: type=gha,scope=migrate
+          cache-to: type=gha,scope=migrate,mode=max
+
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          load: true
+          tags: cloudflow/web:local
+          build-args: VITE_API_URL=http://127.0.0.1:3000
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - name: Scan the images for fixed vulnerabilities
+        run: |
+          for image in api worker migrate web; do
+            echo "::group::cloudflow/$image:local"
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$HOME/.cache/trivy:/root/.cache/" \
+              aquasec/trivy:latest image \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+              "cloudflow/$image:local"
+            echo "::endgroup::"
+          done
+
+      - name: Write the environment file the stack expects
+        run: |
+          cat > .env <<EOF
+          JWT_SECRET=${JWT_SECRET}
+          CORS_ORIGINS=http://127.0.0.1:5173
+          EOF
+
+      - name: Start the stack
+        run: docker compose -f docker-compose.stack.yml up -d --no-build --wait --wait-timeout 180
+
+      - name: Smoke test
+        run: npm run smoke:stack
+
+      - name: Container state and logs
+        if: failure()
+        run: |
+          docker compose -f docker-compose.stack.yml ps -a
+          docker compose -f docker-compose.stack.yml logs --no-color --tail=200
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f docker-compose.stack.yml down -v
+
+  publish:
+    name: Publish images
+    needs: [verify, audit, stack]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the lowercase image prefix
+        run: echo "PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Publish the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: api
+          push: true
+          tags: |
+            ${{ env.PREFIX }}/api:latest
+            ${{ env.PREFIX }}/api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+
+      - name: Publish the worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          push: true
+          tags: |
+            ${{ env.PREFIX }}/worker:latest
+            ${{ env.PREFIX }}/worker:${{ github.sha }}
+          cache-from: type=gha,scope=worker
+
+      - name: Publish the migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrate
+          push: true
+          tags: |
+            ${{ env.PREFIX }}/migrate:latest
+            ${{ env.PREFIX }}/migrate:${{ github.sha }}
+          cache-from: type=gha,scope=migrate
+
+      - name: Publish the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          push: true
+          build-args: VITE_API_URL=${{ vars.VITE_API_URL || 'http://127.0.0.1:3000' }}
+          tags: |
+            ${{ env.PREFIX }}/web:latest
+            ${{ env.PREFIX }}/web:${{ github.sha }}
+          cache-from: type=gha,scope=web

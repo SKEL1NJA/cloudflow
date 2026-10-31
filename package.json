@@ -20,6 +20,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "build:api": "node scripts/bundle.mjs api",
     "build:worker": "node scripts/bundle.mjs worker",
     "stack:up": "docker compose -f docker-compose.stack.yml up --build -d",
