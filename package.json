@@ -19,10 +19,17 @@
     "dev:web": "npm run dev -w apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:api": "node scripts/bundle.mjs api",
+    "build:worker": "node scripts/bundle.mjs worker",
+    "stack:up": "docker compose -f docker-compose.stack.yml up --build -d",
+    "stack:down": "docker compose -f docker-compose.stack.yml down",
+    "stack:logs": "docker compose -f docker-compose.stack.yml logs -f --tail=100",
+    "smoke:stack": "node scripts/smoke-stack.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2"
   }

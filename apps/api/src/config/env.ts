@@ -3,28 +3,36 @@ import path from 'node:path';
 import { z } from 'zod';
 
 const rootEnvPath = path.resolve(import.meta.dirname, '../../../../.env');
+
 if (existsSync(rootEnvPath)) {
   process.loadEnvFile(rootEnvPath);
 }
 
 const originsSchema = z.string().transform((value, ctx) => {
   const origins: string[] = [];
+
   for (const entry of value
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)) {
     try {
       const url = new URL(entry);
-      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== entry) throw new Error();
+
+      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== entry) {
+        throw new Error();
+      }
+
       origins.push(entry);
     } catch {
       ctx.addIssue({
         code: 'custom',
         message: `"${entry}" is not a valid origin, expected something like https://app.example.com`,
       });
+
       return z.NEVER;
     }
   }
+
   return origins;
 });
 
@@ -51,10 +59,12 @@ const envSchema = z.object({
 
 function loadEnv() {
   const result = envSchema.safeParse(process.env);
+
   if (!result.success) {
     console.error('Invalid environment configuration:\n' + z.prettifyError(result.error));
     process.exit(1);
   }
+
   return result.data;
 }
 

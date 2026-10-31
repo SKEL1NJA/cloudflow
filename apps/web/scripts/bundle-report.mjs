@@ -3,7 +3,7 @@ import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 
 const dist = path.resolve(import.meta.dirname, '../dist');
-const budgetKb = Number(process.env.INITIAL_BUDGET_KB ?? 250);
+const budgetKb = Number(process.env.INITIAL_BUDGET_KB ?? 215);
 
 if (!existsSync(path.join(dist, 'index.html'))) {
   console.error('No build found. Run "npm run build -w apps/web" first.');
@@ -22,6 +22,15 @@ const initial = new Set(
   [...html.matchAll(/(?:src|href)="\/assets\/([^"]+\.(?:js|css))"/g)].map((match) => match[1]),
 );
 
+const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>/g)];
+if (inlineScripts.length > 0) {
+  console.error(
+    `index.html has ${inlineScripts.length} inline script(s), which the Content-Security-Policy blocks.`,
+  );
+  console.error('Move the script into apps/web/public and load it with a src attribute.');
+  process.exit(1);
+}
+
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} kB`;
 const rows = [...assets].sort((a, b) => b.gzip - a.gzip);
 const width = Math.max(...rows.map((row) => row.file.length));
@@ -37,7 +46,9 @@ for (const row of rows) {
 const initialGzip = assets
   .filter((asset) => initial.has(asset.file))
   .reduce((sum, asset) => sum + asset.gzip, 0);
+
 const totalGzip = assets.reduce((sum, asset) => sum + asset.gzip, 0);
+
 console.log(`\nFirst load: ${kb(initialGzip)} gzip (budget ${budgetKb} kB)`);
 console.log(`Everything: ${kb(totalGzip)} gzip across ${assets.length} files`);
 

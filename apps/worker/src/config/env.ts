@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 const rootEnvPath = path.resolve(import.meta.dirname, '../../../../.env');
+
 if (existsSync(rootEnvPath)) {
   process.loadEnvFile(rootEnvPath);
 }
@@ -25,10 +26,12 @@ const envSchema = z.object({
 
 function loadEnv() {
   const result = envSchema.safeParse(process.env);
+
   if (!result.success) {
     console.error('Invalid environment configuration:\n' + z.prettifyError(result.error));
     process.exit(1);
   }
+
   return result.data;
 }
 

@@ -1,0 +1,154 @@
+name: cloudflow-stack
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-app-environment: &app-environment
+  NODE_ENV: production
+  DATABASE_URL: postgresql://cloudflow:${POSTGRES_PASSWORD:-cloudflow}@postgres:5432/cloudflow
+  REDIS_URL: redis://redis:6379
+  HTTP_ALLOW_PRIVATE_NETWORK: 'false'
+
+x-hardening: &hardening
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  logging: *logging
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cloudflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudflow}
+      POSTGRES_DB: cloudflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cloudflow -d cloudflow']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redisdata:/data
+    networks:
+      - data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+    restart: unless-stopped
+
+  migrate:
+    image: cloudflow/migrate:local
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://cloudflow:${POSTGRES_PASSWORD:-cloudflow}@postgres:5432/cloudflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+    restart: 'no'
+
+  api:
+    <<: *hardening
+    image: cloudflow/api:local
+    build:
+      context: .
+      target: api
+    env_file:
+      - .env
+    environment:
+      <<: *app-environment
+      API_HOST: 0.0.0.0
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - data
+      - public
+    stop_grace_period: 30s
+    mem_limit: 512m
+
+  worker:
+    <<: *hardening
+    image: cloudflow/worker:local
+    build:
+      context: .
+      target: worker
+    env_file:
+      - .env
+    environment:
+      <<: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - data
+      - public
+    stop_grace_period: 60s
+    mem_limit: 512m
+
+  web:
+    image: cloudflow/web:local
+    build:
+      context: .
+      target: web
+      args:
+        VITE_API_URL: http://127.0.0.1:3000
+    environment:
+      API_ORIGIN: http://127.0.0.1:3000
+    ports:
+      - '127.0.0.1:5173:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - public
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+    restart: unless-stopped
+
+networks:
+  data:
+    internal: true
+  public: {}
+
+volumes:
+  pgdata: {}
+  redisdata: {}
