@@ -102,7 +102,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Build the API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: api
@@ -112,7 +112,7 @@ jobs:
           cache-to: type=gha,scope=api,mode=max
 
       - name: Build the worker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: worker
@@ -122,7 +122,7 @@ jobs:
           cache-to: type=gha,scope=worker,mode=max
 
       - name: Build the migrate image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: migrate
@@ -132,7 +132,7 @@ jobs:
           cache-to: type=gha,scope=migrate,mode=max
 
       - name: Build the web image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: web
@@ -202,7 +202,7 @@ jobs:
         run: echo "PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Publish the API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: api
@@ -213,7 +213,7 @@ jobs:
           cache-from: type=gha,scope=api
 
       - name: Publish the worker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: worker
@@ -224,7 +224,7 @@ jobs:
           cache-from: type=gha,scope=worker
 
       - name: Publish the migrate image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: migrate
@@ -235,7 +235,7 @@ jobs:
           cache-from: type=gha,scope=migrate
 
       - name: Publish the web image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: web
