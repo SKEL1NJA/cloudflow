@@ -49,6 +49,7 @@ export function JsonBlock({ label, value }: { label: string; value: unknown }) {
       ) : (
         <pre
           tabIndex={0}
+          role="group"
           aria-label={label}
           className="max-h-72 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-xs leading-relaxed"
         >

@@ -3,6 +3,7 @@ import { Ellipsis, LoaderCircle, Play } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { StatusBadge } from '@/components/status-badge';
+import { RelativeTime } from '@/components/relative-time';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,16 +13,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { formatDateTime, formatRelativeTime } from '@/lib/format';
 import { DeleteWorkflowDialog } from './delete-workflow-dialog';
 import { newRunVariables, useRunWorkflow, useToggleWorkflow } from './mutations';
 
 interface WorkflowRowProps {
   workflow: WorkflowSummary;
-  now: number;
 }
 
-export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
+export function WorkflowRow({ workflow }: WorkflowRowProps) {
   const navigate = useNavigate();
   const toggle = useToggleWorkflow();
   const run = useRunWorkflow();
@@ -64,11 +63,8 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
           {workflow.lastRun ? (
             <div className="flex items-center gap-2">
               <StatusBadge status={workflow.lastRun.status} />
-              <span
-                className="text-xs whitespace-nowrap text-muted-foreground"
-                title={formatDateTime(workflow.lastRun.at)}
-              >
-                {formatRelativeTime(workflow.lastRun.at, now)}
+              <span className="text-xs whitespace-nowrap text-muted-foreground">
+                <RelativeTime iso={workflow.lastRun.at} />
               </span>
             </div>
           ) : (
@@ -83,11 +79,8 @@ export function WorkflowRow({ workflow, now }: WorkflowRowProps) {
           {workflow.successRate === null ? '-' : `${Math.round(workflow.successRate * 100)}%`}
         </td>
 
-        <td
-          className="px-4 py-2.5 whitespace-nowrap text-muted-foreground"
-          title={formatDateTime(workflow.updatedAt)}
-        >
-          {formatRelativeTime(workflow.updatedAt, now)}
+        <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
+          <RelativeTime iso={workflow.updatedAt} />
         </td>
 
         <td className="px-2 py-2.5">

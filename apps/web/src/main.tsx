@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router/dom';
 import { Toaster } from '@/components/ui/sonner';
 import { bootstrapSession } from '@/auth/bootstrap';
+import { installChunkReload } from '@/lib/chunk-reload';
 import { queryClient } from '@/lib/query-client';
 import { router } from './router';
 import './index.css';
@@ -17,6 +18,7 @@ const Devtools = import.meta.env.DEV
     )
   : null;
 
+installChunkReload();
 void bootstrapSession();
 
 const container = document.getElementById('root');

@@ -1,15 +1,17 @@
 import { Server } from 'lucide-react';
 import { Link } from 'react-router';
+
+import { RelativeTime } from '@/components/relative-time';
 import { EmptyState } from '@/components/layout/empty-state';
 import { ErrorState } from '@/components/layout/error-state';
 import { PageHeader } from '@/components/layout/page-header';
-import { MetricCard } from '@/components/ui/metric-card';
 import { Card } from '@/components/ui/card';
+import { MetricCard } from '@/components/ui/metric-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { WorkerStatusBadge } from '@/components/worker-status-badge';
-import { useNow } from '@/hooks/use-now';
-import { formatDateTime, formatRelativeTime, formatUptime } from '@/lib/format';
+import { formatUptime } from '@/lib/format';
 import { buttonVariants } from '@/components/ui/button';
+
 import { summarizeCapacity } from './capacity';
 import { useWorkers } from './queries';
 
@@ -25,10 +27,10 @@ const HEADERS = [
 
 export function WorkersPage() {
   const { data, error, isError, refetch } = useWorkers();
-  const now = useNow(1000);
   const capacity = data ? summarizeCapacity(data.workers) : undefined;
 
   let table;
+
   if (isError && !data) {
     table = <ErrorState what="your workers" error={error} onRetry={() => void refetch()} />;
   } else if (!data) {
@@ -55,7 +57,7 @@ export function WorkersPage() {
   } else {
     table = (
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Workers table">
           <table className="w-full text-sm">
             <caption className="sr-only">Workers</caption>
             <thead>
@@ -104,11 +106,8 @@ export function WorkersPage() {
                   >
                     {formatUptime(worker.uptimeSeconds)}
                   </td>
-                  <td
-                    className="px-5 py-2.5 whitespace-nowrap text-muted-foreground"
-                    title={formatDateTime(worker.lastHeartbeat)}
-                  >
-                    {formatRelativeTime(worker.lastHeartbeat, now)}
+                  <td className="px-5 py-2.5 whitespace-nowrap text-muted-foreground">
+                    <RelativeTime iso={worker.lastHeartbeat} intervalMs={1000} />
                   </td>
                 </tr>
               ))}
@@ -125,6 +124,7 @@ export function WorkersPage() {
         title="Workers"
         description="Processes that execute your steps. Offline workers stay listed for an hour."
       />
+
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <MetricCard
           label="Online workers"
@@ -151,6 +151,7 @@ export function WorkersPage() {
           hint={capacity ? 'In use across online workers' : undefined}
         />
       </div>
+
       {table}
     </>
   );

@@ -1,36 +1,46 @@
 import { Menu } from 'lucide-react';
-import { useState } from 'react';
-import { Outlet, useMatches } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Outlet, ScrollRestoration, useLocation, useMatches } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { useDocumentTitle } from '@/hooks/use-document-title';
-import { CommandPaletteProvider } from '@/features/command-palette/palette-context';
 import { PaletteButton } from '@/features/command-palette/palette-button';
+import { CommandPaletteProvider } from '@/features/command-palette/palette-context';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { RealtimeProvider } from '@/realtime/provider';
 import { LiveIndicator } from './live-indicator';
+import { NavigationProgress } from './navigation-progress';
+import { OfflineBanner } from './offline-banner';
 import { SidebarContent } from './sidebar';
 import { SystemStatus } from './system-status';
 
 function usePageTitle(): string | undefined {
   const matches = useMatches();
-
   for (let index = matches.length - 1; index >= 0; index -= 1) {
     const handle = matches[index]?.handle as { title?: string } | undefined;
     if (handle?.title) return handle.title;
   }
-
   return undefined;
 }
 
 export function AppShell() {
   const [navOpen, setNavOpen] = useState(false);
   const title = usePageTitle();
-
+  const { pathname } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(pathname);
   useDocumentTitle(title);
+
+  useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
+    mainRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
 
   return (
     <RealtimeProvider>
       <CommandPaletteProvider>
+        <NavigationProgress />
+        <ScrollRestoration />
         <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
           <a
             href="#main"
@@ -60,20 +70,24 @@ export function AppShell() {
               >
                 <Menu aria-hidden="true" />
               </Button>
-
               <p className="truncate text-sm text-muted-foreground">
                 CloudFlow <span aria-hidden="true">/</span>{' '}
                 <span className="font-medium text-foreground">{title ?? 'Page'}</span>
               </p>
-
               <div className="ml-auto flex items-center gap-3">
                 <PaletteButton />
                 <LiveIndicator />
                 <SystemStatus />
               </div>
             </header>
-
-            <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 outline-none lg:px-6">
+            <OfflineBanner />
+            <main
+              id="main"
+              ref={mainRef}
+              tabIndex={-1}
+              aria-label={title}
+              className="flex-1 px-4 py-6 outline-none lg:px-6"
+            >
               <Outlet />
             </main>
           </div>

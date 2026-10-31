@@ -11,7 +11,6 @@ import { Pagination } from '@/components/ui/pagination';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { useNow } from '@/hooks/use-now';
 import { cn } from '@/lib/utils';
 import { useWorkflows } from '@/queries/workflows';
 import { toApiParams, useWorkflowListParams, type ListParams } from './list-params';
@@ -42,7 +41,7 @@ function SortHeader({ column, label, params, onSort }: SortHeaderProps) {
       <button
         type="button"
         onClick={() => onSort(column)}
-        className="inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex min-h-6 items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         {label}
         <Icon className="size-3.5" aria-hidden="true" />
@@ -53,7 +52,6 @@ function SortHeader({ column, label, params, onSort }: SortHeaderProps) {
 
 export function WorkflowsPage() {
   const { params, update } = useWorkflowListParams();
-  const now = useNow(30_000);
   const [text, setText] = useState(params.q);
   const debouncedText = useDebouncedValue(text, 300);
   const { data, error, isError, isPlaceholderData, refetch } = useWorkflows(toApiParams(params));
@@ -164,7 +162,7 @@ export function WorkflowsPage() {
               </thead>
               <tbody className="divide-y">
                 {data.data.map((workflow) => (
-                  <WorkflowRow key={workflow.id} workflow={workflow} now={now} />
+                  <WorkflowRow key={workflow.id} workflow={workflow} />
                 ))}
               </tbody>
             </table>

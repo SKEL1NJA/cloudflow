@@ -85,15 +85,18 @@ export function ApiKeysSection() {
   const [created, setCreated] = useState<CreatedApiKey | null>(null);
   const [revoking, setRevoking] = useState<ApiKeyView | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
   const form = useForm<CreateApiKeyInput>({
     resolver: zodResolver(createApiKeySchema),
     defaultValues: { name: '' },
   });
+
   const { register, handleSubmit, formState } = form;
   const activeCount = keys.data?.filter((key) => key.revokedAt === null).length ?? 0;
 
   const onSubmit = handleSubmit(async ({ name }) => {
     setFormError(null);
+
     try {
       setCreated(await create.mutateAsync(name));
       form.reset({ name: '' });
@@ -111,6 +114,7 @@ export function ApiKeysSection() {
             Keys let scripts and other tools call the CloudFlow API. A key can do everything you
             can, except manage keys and sessions.
           </p>
+
           <form
             noValidate
             onSubmit={(event) => void onSubmit(event)}
@@ -126,6 +130,7 @@ export function ApiKeysSection() {
                 {...register('name')}
               />
             </div>
+
             <Button type="submit" className="mt-6" disabled={formState.isSubmitting}>
               {formState.isSubmitting ? (
                 <LoaderCircle className="animate-spin" aria-hidden="true" />
@@ -133,6 +138,7 @@ export function ApiKeysSection() {
               Create key
             </Button>
           </form>
+
           {formError ? (
             <p role="alert" className="mt-3 text-sm text-danger">
               {formError}
@@ -151,6 +157,7 @@ export function ApiKeysSection() {
               </p>
             ) : null}
           </div>
+
           {keys.isError && !keys.data ? (
             <div className="px-5 pb-5">
               <ErrorState
@@ -215,6 +222,7 @@ export function ApiKeysSection() {
           <p className="mt-1 text-xs text-muted-foreground">Send it as a bearer token.</p>
           <pre
             tabIndex={0}
+            role="group"
             aria-label="Example request"
             className="mt-3 overflow-x-auto rounded-md border bg-muted/30 p-3 font-mono text-xs"
           >
@@ -224,6 +232,7 @@ export function ApiKeysSection() {
       </Card>
 
       <KeyRevealDialog created={created} onDone={() => setCreated(null)} />
+
       <ConfirmDialog
         open={revoking !== null}
         onOpenChange={(open) => {

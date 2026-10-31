@@ -124,6 +124,7 @@ function ConfigurationTab({ workflow }: { workflow: WorkflowDetail }) {
       <p className="text-sm text-muted-foreground">Header values are hidden.</p>
       <pre
         tabIndex={0}
+        role="group"
         aria-label="Workflow definition"
         className="overflow-x-auto rounded-lg border bg-card p-4 font-mono text-xs leading-relaxed"
       >

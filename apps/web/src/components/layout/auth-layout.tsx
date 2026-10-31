@@ -16,9 +16,9 @@ export function AuthLayout({ title, description, footer, children }: AuthLayoutP
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-10">
-      <div className="absolute top-4 right-4">
+      <header className="absolute top-4 right-4">
         <ThemeToggle />
-      </div>
+      </header>
       <main className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <LogoMark className="size-9" />
