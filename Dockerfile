@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-slim AS manifests
+FROM node:25-slim AS manifests
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
@@ -30,7 +30,7 @@ FROM manifests AS worker-deps
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --ignore-scripts -w apps/worker -w packages/db -w packages/queue -w packages/shared
 
-FROM node:24-slim AS api
+FROM node:25-slim AS api
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=api-deps /app/node_modules ./node_modules
@@ -41,7 +41,7 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "--enable-source-maps", "apps/api/dist/index.mjs"]
 
-FROM node:24-slim AS worker
+FROM node:25-slim AS worker
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=worker-deps /app/node_modules ./node_modules
