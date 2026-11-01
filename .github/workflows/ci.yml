@@ -205,7 +205,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Work out the lowercase image prefix
-        run: echo "PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+        id: image-prefix
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Publish the API image
         uses: docker/build-push-action@v6
@@ -215,8 +216,8 @@ jobs:
           pull: true
           push: true
           tags: |
-            ${{ env.PREFIX }}/api:latest
-            ${{ env.PREFIX }}/api:${{ github.sha }}
+            ${{ steps.image-prefix.outputs.prefix }}/api:latest
+            ${{ steps.image-prefix.outputs.prefix }}/api:${{ github.sha }}
           cache-from: type=gha,scope=api
 
       - name: Publish the worker image
@@ -227,8 +228,8 @@ jobs:
           pull: true
           push: true
           tags: |
-            ${{ env.PREFIX }}/worker:latest
-            ${{ env.PREFIX }}/worker:${{ github.sha }}
+            ${{ steps.image-prefix.outputs.prefix }}/worker:latest
+            ${{ steps.image-prefix.outputs.prefix }}/worker:${{ github.sha }}
           cache-from: type=gha,scope=worker
 
       - name: Publish the migrate image
@@ -239,8 +240,8 @@ jobs:
           pull: true
           push: true
           tags: |
-            ${{ env.PREFIX }}/migrate:latest
-            ${{ env.PREFIX }}/migrate:${{ github.sha }}
+            ${{ steps.image-prefix.outputs.prefix }}/migrate:latest
+            ${{ steps.image-prefix.outputs.prefix }}/migrate:${{ github.sha }}
           cache-from: type=gha,scope=migrate
 
       - name: Publish the web image
@@ -252,6 +253,6 @@ jobs:
           push: true
           build-args: VITE_API_URL=${{ vars.VITE_API_URL || 'http://127.0.0.1:3000' }}
           tags: |
-            ${{ env.PREFIX }}/web:latest
-            ${{ env.PREFIX }}/web:${{ github.sha }}
+            ${{ steps.image-prefix.outputs.prefix }}/web:latest
+            ${{ steps.image-prefix.outputs.prefix }}/web:${{ github.sha }}
           cache-from: type=gha,scope=web

@@ -38,7 +38,7 @@ COPY --from=bundles /app/apps/api/dist ./apps/api/dist
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+    CMD node -e "fetch('http://127.0.0.1:3000/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "--enable-source-maps", "apps/api/dist/index.mjs"]
 
 FROM node:24-slim AS worker
@@ -48,14 +48,29 @@ COPY --from=worker-deps /app/node_modules ./node_modules
 COPY --from=bundles /app/apps/worker/dist ./apps/worker/dist
 USER node
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "require('node:net').connect(Number(process.env.WORKER_METRICS_PORT||9101),'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+    CMD node -e "require('node:net').connect(Number(process.env.WORKER_METRICS_PORT||9101),'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
 CMD ["node", "--enable-source-maps", "apps/worker/dist/index.mjs"]
 
-FROM build AS migrate
+FROM manifests AS migrate-deps
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts -w packages/db --include=dev
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/packages/db
+ENV PRISMA_SCHEMA_ENGINE_BINARY=
+RUN node node_modules/prisma/build/index.js version
+
+FROM node:24-slim AS migrate
 ENV NODE_ENV=production PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=migrate-deps --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node packages/db ./packages/db
+COPY --from=migrate-deps --chown=node:node /app/packages/db/node_modules ./packages/db/node_modules
 WORKDIR /app/packages/db
 USER node
-CMD ["npx", "prisma", "migrate", "deploy"]
+CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
 
 FROM build AS web-build
 ARG VITE_API_URL
@@ -68,4 +83,4 @@ COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.templa
 COPY --from=web-build /app/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz

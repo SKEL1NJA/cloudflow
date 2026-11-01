@@ -29,7 +29,7 @@ async function call(path, { method = 'GET', body, token, headers = {} } = {}) {
   const response = await fetch(`${apiUrl}${path}`, {
     method,
     headers: {
-      'content-type': 'application/json',
+      ...(body !== undefined && { 'content-type': 'application/json' }),
       origin: webUrl,
       ...(token && { authorization: `Bearer ${token}` }),
       ...headers,
