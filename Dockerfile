@@ -1,3 +1,4 @@
+
 # syntax=docker/dockerfile:1.7
 
 FROM node:24-slim AS manifests
@@ -24,15 +25,18 @@ RUN node scripts/bundle.mjs api && node scripts/bundle.mjs worker
 
 FROM manifests AS api-deps
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --ignore-scripts -w apps/api -w packages/db -w packages/queue -w packages/shared
+    npm ci --omit=dev --ignore-scripts -w apps/api -w packages/db -w packages/queue -w packages/shared \
+    && rm -rf node_modules/@typescript node_modules/typescript
 
 FROM manifests AS worker-deps
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --ignore-scripts -w apps/worker -w packages/db -w packages/queue -w packages/shared
+    npm ci --omit=dev --ignore-scripts -w apps/worker -w packages/db -w packages/queue -w packages/shared \
+    && rm -rf node_modules/@typescript node_modules/typescript
 
 FROM node:24-slim AS api
 ENV NODE_ENV=production
 WORKDIR /app
+RUN rm -rf /usr/local/lib/node_modules/npm
 COPY --from=api-deps /app/node_modules ./node_modules
 COPY --from=bundles /app/apps/api/dist ./apps/api/dist
 USER node
@@ -44,6 +48,7 @@ CMD ["node", "--enable-source-maps", "apps/api/dist/index.mjs"]
 FROM node:24-slim AS worker
 ENV NODE_ENV=production
 WORKDIR /app
+RUN rm -rf /usr/local/lib/node_modules/npm
 COPY --from=worker-deps /app/node_modules ./node_modules
 COPY --from=bundles /app/apps/worker/dist ./apps/worker/dist
 USER node
@@ -53,24 +58,26 @@ CMD ["node", "--enable-source-maps", "apps/worker/dist/index.mjs"]
 
 FROM manifests AS migrate-deps
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts -w packages/db --include=dev
+    npm ci --ignore-scripts -w packages/db --include=dev \
+    && rm -rf node_modules/@typescript node_modules/typescript
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/packages/db
 ENV PRISMA_SCHEMA_ENGINE_BINARY=
-RUN node node_modules/prisma/build/index.js version
+RUN node /app/node_modules/prisma/build/index.js version
 
 FROM node:24-slim AS migrate
 ENV NODE_ENV=production PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /usr/local/lib/node_modules/npm
 WORKDIR /app
 COPY --from=migrate-deps --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node packages/db ./packages/db
 COPY --from=migrate-deps --chown=node:node /app/packages/db/node_modules ./packages/db/node_modules
 WORKDIR /app/packages/db
 USER node
-CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
+CMD ["node", "/app/node_modules/prisma/build/index.js", "migrate", "deploy"]
 
 FROM build AS web-build
 ARG VITE_API_URL
@@ -78,6 +85,13 @@ ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build -w apps/web && npm run report -w apps/web
 
 FROM nginxinc/nginx-unprivileged:stable-alpine AS web
+
+USER root
+RUN sed -i '/^nginx=/d; /^nginx-module-/d' /etc/apk/world \
+    && apk update \
+    && apk add nginx=1.30.8-r0 \
+    && apk upgrade brotli-libs curl musl musl-utils zlib
+USER nginx
 ENV API_ORIGIN=http://127.0.0.1:3000
 COPY docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=web-build /app/apps/web/dist /usr/share/nginx/html
